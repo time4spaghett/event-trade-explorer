@@ -89,6 +89,13 @@ def tally(vals):
     return len(v), sum(x > 0 for x in v), (float(np.mean(v)) if v else None), (float(np.median(v)) if v else None)
 
 
+def trig(X: dict) -> str:
+    """The event trigger in words, lower-cased to follow a colon ("a stock that tripled ...")."""
+    t = (X.get("plain") or X["event"]).strip().rstrip(".")
+    w = t.split(" ", 1)[0]
+    return t if len(w) > 1 and w.isupper() else t[:1].lower() + t[1:]   # keep tickers and acronyms (VIX, S&P)
+
+
 def headline(X: dict, small: bool = False):
     when = (f"today's move is not in our prices yet (through {X['data_through']})" if X.get("pending")
             else X["event_date"])
@@ -183,7 +190,7 @@ def full(s: dict, X: dict, also: list | None = None):
                                                            if r["pick"] in by else "–")} for r in L["picks_21"]]),
                      hide_index=True, use_container_width=True)
     if also:
-        st.markdown(f"### Similar cases to {html.escape(X['subject'])}")
+        st.markdown(f"### Similar cases to {html.escape(X['subject'])}: {html.escape(trig(X))}")
         rows = []
         for (s2, j2, X2) in also:
             a, b = tally([c["after_21"] for c in X2["cases"]]), tally([c["after_252"] for c in X2["cases"]])
@@ -265,7 +272,7 @@ if s_open and ex(s_open, open_v):
             st.query_params.clear()
             st.rerun()
         X0 = ex(s_open, open_v)
-        st.markdown(f"## Similar cases to {html.escape(X0['subject'])}")
+        st.markdown(f"## Similar cases to {html.escape(X0['subject'])}: {html.escape(trig(X0))}")
         for k, (s2, j2, X2) in enumerate([(s_open, open_v, ex(s_open, open_v))] + others):
             card(s2, X2, 100 + k, j2, 0)
     else:
