@@ -25,7 +25,7 @@ import streamlit as st
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
 TOP = 5
-NOT_ADVICE = "History, not investment advice. Past results do not tell you what happens next."
+NOT_ADVICE = ""  # Alex 2026-11-06: dropped
 GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
 PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98c379", "#ff9e64"]  # ticked cases
 
@@ -111,7 +111,7 @@ def boxes(X: dict):
                 f"<span class='meta'>{since}</span></div>", unsafe_allow_html=True)
     for col, name, n, w, a, m in ((c2, "1 month", n1, w1, a1, m1), (c3, "1 year", n2, w2, a2, m2)):
         col.markdown(f"<div class='box'><span class='meta'>{name} later, {did}</span><br><span class='big'>"
-                     f"{f'{w} of {n}' if n else '–'}</span><br><span class='meta'>typical result <span class='{cls(m)}'>"
+                     f"{f'{w} of {n}' if n else '–'}</span><br><span class='meta'>middle case <span class='{cls(m)}'>"
                      f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
 
 
@@ -133,7 +133,7 @@ def overlay(X: dict, sel: set | None = None):
         ok = np.isfinite(P).sum(0) >= 5
         with np.errstate(all="ignore"):
             med = np.where(ok, np.nanmedian(P, axis=0), np.nan)
-        fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="the typical past case")
+        fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="the middle past case")
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
     fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                     name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
@@ -147,11 +147,11 @@ def overlay(X: dict, sel: set | None = None):
     more = f" Only the {len(P)} newest past cases have a line." if X.get("paths_from") else ""
     st.caption(("Showing the past cases ticked in the table below. " if sel else
                 "Each grey line is one past case; tick cases in the table below to show only those. ")
-               + "The blue line is the middle of all past cases on each day. Left of 0 is the lead-up; right of 0 is "
+               + "The blue line is the middle past case on each day. Left of 0 is the lead-up; right of 0 is "
                "what came after." + more)
 
 
-def full(s: dict, X: dict):
+def full(s: dict, X: dict, also: list | None = None):
     if st.button("← Back to today"):
         st.query_params.clear()
         st.rerun()
@@ -169,8 +169,8 @@ def full(s: dict, X: dict):
             sub = cases.iloc[idx] if idx else cases.iloc[0:0]
             a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
             rows.append({"ranking": k, "past cases": len(sub),
-                         "1 month later: beat the market": f"{a[1]} of {a[0]}" if a[0] else "–", "1 month, typical": pct(a[3]),
-                         "1 year later: beat the market": f"{b[1]} of {b[0]}" if b[0] else "–", "1 year, typical": pct(b[3])})
+                         "1 month later: beat the market": f"{a[1]} of {a[0]}" if a[0] else "–", "1 month, middle case": pct(a[3]),
+                         "1 year later: beat the market": f"{b[1]} of {b[0]}" if b[0] else "–", "1 year, middle case": pct(b[3])})
         st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
         st.markdown("**Which kind of stock did best after it, against the market** (top fifth of the S&P 500 on each ranking)")
@@ -182,6 +182,22 @@ def full(s: dict, X: dict):
                                     "ahead after 1 year": (f"{by[r['pick']].get('won')} of {by[r['pick']].get('n')}"
                                                            if r["pick"] in by else "–")} for r in L["picks_21"]]),
                      hide_index=True, use_container_width=True)
+    if also:
+        st.markdown("**Other versions of this move** (the story's other events, and other stories about the same thing): "
+                    "do they tell the same story?")
+        rows = []
+        for (s2, j2, X2) in also:
+            a, b = tally([c["after_21"] for c in X2["cases"]]), tally([c["after_252"] for c in X2["cases"]])
+            did = "beat the market" if X2["kind"] == "stock" else "market up"
+            rows.append({"version": f"{X2['subject']}: {X2['plain'] or X2['event']}", "past cases": len(X2["cases"]),
+                         f"1 month later": f"{a[1]} of {a[0]} {did}, middle case {pct(a[3])}" if a[0] else "–",
+                         f"1 year later": f"{b[1]} of {b[0]} {did}, middle case {pct(b[3])}" if b[0] else "–"})
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        pick = st.selectbox("Open another version", ["–"] + [r["version"] for r in rows], key=f"ver_{s['id']}")
+        if pick != "–":
+            s2, j2, _ = also[[r["version"] for r in rows].index(pick)]
+            st.query_params.update({"story": s2["id"], "v": str(j2)})
+            st.rerun()
     if len(cases):
         st.markdown("**Every past case** (tick any to show only those in the chart)")
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
@@ -205,13 +221,19 @@ def full(s: dict, X: dict):
                 f"Prices through {X['data_through']}. {NOT_ADVICE}</span>", unsafe_allow_html=True)
 
 
-def card(s: dict, X: dict, i: int):
+def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
     with st.container(border=True):
         headline(X, small=True)
         boxes(X)
-        st.markdown(f"<p class='news'>{html.escape(s['headline'])}</p>", unsafe_allow_html=True)
-        if st.button("See the history →", key=f"open{i}"):
-            st.query_params["story"] = s["id"]
+        extra = f" · also checked {n_also} other version{'s' if n_also > 1 else ''}" if n_also else ""
+        st.markdown(f"<p class='news'>{html.escape(s['headline'])}<span class='meta'>{extra}</span></p>", unsafe_allow_html=True)
+        b1, b2, _ = st.columns([1, 1.3, 5])
+        if b1.button("More info →", key=f"open{i}"):
+            st.query_params.clear()
+            st.query_params.update({"story": s["id"], "v": str(j)})
+            st.rerun()
+        if n_also and b2.button(f"Similar cases ({n_also})", key=f"sim{i}"):
+            st.query_params.update({"story": s["id"], "v": str(j), "view": "similar"})
             st.rerun()
 
 
@@ -221,19 +243,40 @@ st.markdown("<p class='mast'>Event-related Trade Explorer</p>", unsafe_allow_htm
 if not today:
     st.info("The first daily edition is not out yet.")
     st.stop()
-st.markdown(f"<span class='meta'>{today['date']} · prices through {today.get('data_through')} · {NOT_ADVICE}</span>",
+st.markdown(f"<span class='meta'>{today['date']} · prices through {today.get('data_through')}</span>",
             unsafe_allow_html=True)
-stories = [s for s in today["stories"] if s.get("exhibit")]
+stories = today["stories"]
+groups = [{"lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], j) for i, j in g["also"]]}
+          for g in today.get("front") or []]
 
-open_id = st.query_params.get("story")
+
+def ex(s, j):
+    return (s.get("exhibits") or [None])[j] if j < len(s.get("exhibits") or []) else None
+
+
+open_id, open_v = st.query_params.get("story"), int(st.query_params.get("v", 0) or 0)
 s_open = next((s for s in stories if s["id"] == open_id), None)
-if s_open:
-    full(s_open, s_open["exhibit"])
+if s_open and ex(s_open, open_v):
+    g = next((g for g in groups if (g["lead"][0]["id"], g["lead"][1]) == (open_id, open_v)
+              or any((s2["id"], j2) == (open_id, open_v) for s2, j2 in g["also"])), None)
+    others = [] if g is None else [(s2, j2, ex(s2, j2)) for s2, j2 in [g["lead"]] + g["also"]
+                                   if (s2["id"], j2) != (open_id, open_v) and ex(s2, j2)]
+    if st.query_params.get("view") == "similar":
+        if st.button("← Back to today"):
+            st.query_params.clear()
+            st.rerun()
+        st.markdown("**Other versions of this move**, side by side: the same news cut different ways, and other "
+                    "stories about the same thing.")
+        for k, (s2, j2, X2) in enumerate([(s_open, open_v, ex(s_open, open_v))] + others):
+            card(s2, X2, 100 + k, j2, 0)
+    else:
+        full(s_open, ex(s_open, open_v), others)
     st.stop()
 
 items = []
-for s in stories[:TOP]:
-    X = s["exhibit"]
+for g in groups[:TOP]:
+    s, j = g["lead"]
+    X = ex(s, j)
     n, w, _, _ = tally([c["after_21"] for c in X["cases"]])
     tail = (f"{X['subject']}: {w} of {n} past cases {'beat the market' if X['kind'] == 'stock' else 'saw the market up'}"
             f" a month later") if n else ""
@@ -243,13 +286,13 @@ st.markdown(f"<div class='chiron'><span class='run'>{''.join(items)}</span></div
 tab_today, tab_search, tab_ask = st.tabs(["Today", "Search the archive", "Commission a study"])
 
 with tab_today:
-    for i, s in enumerate(stories[:TOP]):
-        card(s, s["exhibit"], i)
-    rest = stories[TOP:]
+    for i, g in enumerate(groups[:TOP]):
+        card(g["lead"][0], ex(*g["lead"]), i, g["lead"][1], len(g["also"]))
+    rest = groups[TOP:]
     if rest:
         if st.session_state.get("more"):
-            for i, s in enumerate(rest, start=TOP):
-                card(s, s["exhibit"], i)
+            for i, g in enumerate(rest, start=TOP):
+                card(g["lead"][0], ex(*g["lead"]), i, g["lead"][1], len(g["also"]))
         elif st.button(f"Load more ({len(rest)})"):
             st.session_state.more = True
             st.rerun()
@@ -291,4 +334,3 @@ with tab_ask:
                        disabled=not ask.strip())
     else:
         st.button("Requests are coming soon", disabled=True)
-    st.caption(NOT_ADVICE)
