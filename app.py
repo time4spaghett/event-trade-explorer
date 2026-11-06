@@ -96,14 +96,25 @@ def trig(X: dict) -> str:
     return t if len(w) > 1 and w.isupper() else t[:1].lower() + t[1:]   # keep tickers and acronyms (VIX, S&P)
 
 
+def day(d: str) -> str:
+    t = pd.Timestamp(d)
+    return f"{t:%b} {t.day}, {t.year}"
+
+
 def headline(X: dict, small: bool = False):
-    when = (f"today's move is not in our prices yet (through {X['data_through']})" if X.get("pending")
-            else X["event_date"])
-    yb = (f"; {pct(X['year_before'])} against {X['against']} in the year before" if X["kind"] == "stock"
-          else f"; the US stock average {pct(X['year_before'])} in the year before")
+    when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
+            else f"Happened {day(X['event_date'])}")
+    y = X.get("year_before")
+    if y is None:
+        yb = ""
+    elif X["kind"] == "stock":
+        yb = (f" · in the 12 months before, {X['subject']} {'beat' if y >= 0 else 'trailed'} the average S&amp;P 500 "
+              f"stock by {abs(y) * 100:.0f}%")
+    else:
+        yb = f" · in the 12 months before, the average US stock {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
-                f"<div class='why'>{html.escape(X['plain'] or X['event'])} <span class='meta'>({when}{yb})</span></div>",
-                unsafe_allow_html=True)
+                f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
+                f"<div class='meta' style='margin:-.5rem 0 .8rem 0'>{when}{yb}</div>", unsafe_allow_html=True)
 
 
 def boxes(X: dict):
@@ -256,8 +267,26 @@ groups = [{"lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], 
           for g in today.get("front") or []]
 
 
+RECENT = st.toggle("Include past cases from the last year", value=False,
+                   help="Off: only past cases at least a year old, so their year after does not overlap today's.")
+
+
+def trim(X: dict | None) -> dict | None:
+    """Alex 2026-11-06: by default only past cases at least a year old (their 1-year result is in), so recent cases
+    that overlap each other and today's move do not crowd the counts, the chart or the table."""
+    if X is None or RECENT:
+        return X
+    keep = [i for i, c in enumerate(X["cases"]) if c.get("after_252") is not None]
+    new = {old: k for k, old in enumerate(keep)}
+    p0 = X.get("paths_from", 0)
+    pk = [(new[p0 + i], p) for i, p in enumerate(X["paths"]) if p0 + i in new]
+    return {**X, "cases": [X["cases"][i] for i in keep], "paths": [p for _, p in pk],
+            "paths_from": pk[0][0] if pk else 0,
+            "rankings": {k: [new[i] for i in v if i in new] for k, v in (X.get("rankings") or {}).items()}}
+
+
 def ex(s, j):
-    return (s.get("exhibits") or [None])[j] if j < len(s.get("exhibits") or []) else None
+    return trim((s.get("exhibits") or [None])[j]) if j < len(s.get("exhibits") or []) else None
 
 
 open_id, open_v = st.query_params.get("story"), int(st.query_params.get("v", 0) or 0)
