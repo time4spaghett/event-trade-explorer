@@ -68,7 +68,7 @@ if pw and not st.session_state.get("ok"):
 
 
 @st.cache_data(ttl=600)
-def load():
+def load(stamp: tuple):  # stamp = the data files' change times, so a new edition shows at once
     t = json.loads((DATA / "today.json").read_text(encoding="utf-8")) if (DATA / "today.json").exists() else None
     a = []
     if (DATA / "archive.json.gz").exists():
@@ -154,7 +154,7 @@ def study_block(stu: dict, key: str):
                          hide_index=True, use_container_width=True)
 
 
-today, archive = load()
+today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
 
 st.markdown("<p class='mast'>Event-related Trade Explorer</p>", unsafe_allow_html=True)
 if not today:
