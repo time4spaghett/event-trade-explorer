@@ -109,7 +109,30 @@ def day(d: str) -> str:
     return f"{t:%b} {t.day}, {t.year}"
 
 
+def lib_status(X: dict) -> tuple[bool, str]:
+    """Library page: (happening now?, the day it last happened). Market pages are 'pending' when they did not fire
+    in the last week; their last past case is then the last time it happened."""
+    if X["kind"] == "stock":
+        return bool(X.get("recent")), X["event_date"]
+    active = not X.get("pending")
+    last = X["event_date"] if active else max((c["date"] for c in X["cases"]), default=X["event_date"])
+    return active, last
+
+
 def headline(X: dict, small: bool = False):
+    if X.get("library"):
+        active, last = lib_status(X)
+        r_ = X.get("recent") or []
+        if active:
+            tag = "<span style='color:#3fb27f;font-size:.45em;font-weight:600;vertical-align:middle'>(active now)</span>"
+            line = f"Last happened {day(last)}" + (
+                f" · in the last week: {', '.join(r_[:10])}{' and others' if len(r_) > 10 else ''}" if r_ else "")
+        else:
+            tag = "<span style='color:#9aa3b2;font-size:.45em;font-weight:400;vertical-align:middle'>(currently inactive)</span>"
+            line = f"Last happened {day(last)}"
+        st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape((X['plain'] or X['event']).rstrip('.'))} {tag}</div>"
+                    f"<div class='meta' style='margin:.3rem 0 .8rem 0'>{line}</div>", unsafe_allow_html=True)
+        return
     when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
             else f"Last happened {day(X['event_date'])}" if X.get("library") else f"Happened {day(X['event_date'])}")
     y = X.get("year_before")
@@ -211,6 +234,8 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None):
                             fillcolor="rgba(91,141,239,.30)", name="80% of past cases", hoverinfo="skip")
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
+    if X.get("library") and not lib_status(X)[0]:
+        s = s * np.nan
     if np.isfinite(s).any():
         fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                         name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
@@ -259,16 +284,27 @@ def bars(rows: list, did: str):
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-def full(s: dict, X: dict, also: list | None = None):
-    if st.button("← Back to today"):
+def back():
+    """Back to the search a page was opened from (?from=search&q=...), else to today."""
+    if st.query_params.get("from") == "search":
+        if st.button("← Back to search"):
+            q_ = st.query_params.get("q", "")
+            st.query_params.clear()
+            st.query_params.update({"view": "search", "q": q_})
+            st.rerun()
+    elif st.button("← Back to today"):
         st.query_params.clear()
         st.rerun()
+
+
+def full(s: dict, X: dict, also: list | None = None):
+    back()
     headline(X)
     boxes(X)
     take_box(X)
     who = "Now" if X["kind"] != "stock" else ("The past cases" if X.get("library") else X["subject"])
-    st.markdown(f"**{who} against the {len(X['cases'])} past cases**" if not X.get("library") or X["kind"] != "stock"
-                else f"**The {len(X['cases'])} past cases**")
+    st.markdown(f"**The {len(X['cases'])} past cases**" if X.get("library") and not (X["kind"] != "stock" and lib_status(X)[0])
+                else f"**{who} against the {len(X['cases'])} past cases**")
     extra = None
     if X.get("library") and X["kind"] == "stock":
         ov = load_overlay()
@@ -464,17 +500,92 @@ def ex(s, j):
     return trim((s.get("exhibits") or [None])[j]) if j < len(s.get("exhibits") or []) else None
 
 
+def search_ui(prefill: str = "", key: str = "q_tab"):
+    q = st.text_input("Search past event studies", value=prefill, key=key,
+                      placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
+    if archive:
+        df = pd.DataFrame(archive).assign(src="news")
+        df = df.drop_duplicates(["story_id", "event"]).reset_index(drop=True)   # a story kept for days: newest copy
+        li = lib_index()
+        if li:   # the library: base-rate questions people look up (library_gen.py / library_build.py)
+            L = pd.DataFrame(li).assign(src="library", headline=lambda d: d.title, summary="", tickers=[[]] * len(li),
+                                        story_id=None, date="library", lead=None)
+            df = pd.concat([df, L], ignore_index=True)
+        df["text"] = (df.headline.fillna("") + " " + df.summary.fillna("") + " " + df.plain.fillna("") + " "
+                      + df.event.fillna("") + " " + df.tickers.apply(lambda t: " ".join(t or [])))
+        if q.strip():
+            key = secret("anthropic_api_key")
+            n_q = st.session_state.get("n_search", 0)
+            order = None
+            if key and n_q < MAX_SEARCHES:
+                st.session_state.n_search = n_q + 1
+                try:
+                    with st.spinner("Searching ..."):
+                        order = haiku_search(q.strip(), tuple(df.text), key)
+                except Exception as exc:  # noqa: BLE001  (any API trouble: fall back to word matching)
+                    st.caption(f"Smart search is down ({type(exc).__name__}); matching words instead.")
+            if order is None:
+                order = word_search(q, tuple(df.text))
+            df = df.iloc[order]
+        st.caption(f"{len(df)} studies" + (" match" if q.strip() else " so far, newest first"))
+        for r in df.head(30).itertuples():
+            lead = r.lead or {}
+            parts = []
+            for h, name in (("21", "1 month"), ("252", "1 year")):
+                a = lead.get(f"after_{h}") or {}
+                if a.get("n"):
+                    parts.append(f"{name} later: {'ahead' if r.kind == 'stock' else 'up'} in {a.get('won')} of {a['n']} "
+                                 f"(average {pct(a.get('avg'))})")
+            if r.src == "library":
+                with st.expander(f"Library · {r.plain}"):
+                    st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
+                                f"{html.escape(r.line)}", unsafe_allow_html=True)
+                    if st.button("Open →", key=f"lib{r.Index}"):
+                        st.query_params.clear()
+                        st.query_params.update({"lib": r.id, "from": "search", "q": q})
+                        st.rerun()
+                continue
+            with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
+                st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
+                            f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
+                if st.button("Open →", key=f"srch{r.Index}"):
+                    f_ = DATA / "days" / f"{r.date}.json.gz"
+                    E_ = today if r.date == today["date"] else (load_day(r.date, f_.stat().st_mtime) if f_.exists() else None)
+                    s_ = next((x for x in (E_ or {}).get("stories", []) if x["id"] == r.story_id), None)
+                    j_ = next((k for k, x in enumerate((s_ or {}).get("studies", [])) if x.get("event") == r.event), None)
+                    if s_ is None or j_ is None or not ((s_.get("exhibits") or [None] * (j_ + 1))[j_]):
+                        st.caption("This study's full page is not available.")
+                    else:
+                        st.query_params.clear()
+                        st.query_params.update({"story": r.story_id, "v": str(j_), "from": "search", "q": q,
+                                                **({"day": r.date} if r.date != today["date"] else {})})
+                        st.rerun()
+    else:
+        st.caption("The archive fills up as daily editions come out.")
+
+
+
+if st.query_params.get("view") == "search":
+    if st.button("← Back to today"):
+        st.query_params.clear()
+        st.rerun()
+    search_ui(st.query_params.get("q", ""), key="q_view")
+    st.stop()
+
+
 lib_id = st.query_params.get("lib")
 if lib_id and (LIB / f"{lib_id}.json.gz").exists():
     XL = trim(load_lib(lib_id, (LIB / f"{lib_id}.json.gz").stat().st_mtime))
+    XL = {**XL, "subject": XL.get("plain") or XL["subject"]}   # the rule's own words, not the question's
     full({"id": lib_id}, XL)
     sib = [r for r in lib_index() if r["qid"] == XL.get("qid") and r["id"] != lib_id]
     if sib:
-        st.markdown(f"### Similar cases: {html.escape(XL['subject'])}")
+        st.markdown(f"### Similar cases: {html.escape(XL.get('title') or XL['subject'])}")
         for r in sib:
             if st.button(f"{r['plain']} ({r['past_cases']} past cases) →", key=f"sib{r['id']}"):
+                keep_ = {k: st.query_params.get(k) for k in ("from", "q") if st.query_params.get(k)}
                 st.query_params.clear()
-                st.query_params["lib"] = r["id"]
+                st.query_params.update({"lib": r["id"], **keep_})
                 st.rerun()
     recent_switch()
     st.stop()
@@ -526,66 +637,7 @@ with tab_today:
     recent_switch()
 
 with tab_search:
-    q = st.text_input("Search past event studies", placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
-    if archive:
-        df = pd.DataFrame(archive).assign(src="news")
-        df = df.drop_duplicates(["story_id", "event"]).reset_index(drop=True)   # a story kept for days: newest copy
-        li = lib_index()
-        if li:   # the library: base-rate questions people look up (library_gen.py / library_build.py)
-            L = pd.DataFrame(li).assign(src="library", headline=lambda d: d.title, summary="", tickers=[[]] * len(li),
-                                        story_id=None, date="library", lead=None)
-            df = pd.concat([df, L], ignore_index=True)
-        df["text"] = (df.headline.fillna("") + " " + df.summary.fillna("") + " " + df.plain.fillna("") + " "
-                      + df.event.fillna("") + " " + df.tickers.apply(lambda t: " ".join(t or [])))
-        if q.strip():
-            key = secret("anthropic_api_key")
-            n_q = st.session_state.get("n_search", 0)
-            order = None
-            if key and n_q < MAX_SEARCHES:
-                st.session_state.n_search = n_q + 1
-                try:
-                    with st.spinner("Searching ..."):
-                        order = haiku_search(q.strip(), tuple(df.text), key)
-                except Exception as exc:  # noqa: BLE001  (any API trouble: fall back to word matching)
-                    st.caption(f"Smart search is down ({type(exc).__name__}); matching words instead.")
-            if order is None:
-                order = word_search(q, tuple(df.text))
-            df = df.iloc[order]
-        st.caption(f"{len(df)} studies" + (" match" if q.strip() else " so far, newest first"))
-        for r in df.head(30).itertuples():
-            lead = r.lead or {}
-            parts = []
-            for h, name in (("21", "1 month"), ("252", "1 year")):
-                a = lead.get(f"after_{h}") or {}
-                if a.get("n"):
-                    parts.append(f"{name} later: {'ahead' if r.kind == 'stock' else 'up'} in {a.get('won')} of {a['n']} "
-                                 f"(average {pct(a.get('avg'))})")
-            if r.src == "library":
-                with st.expander(f"Library · {r.headline} — {r.plain}"):
-                    st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
-                                f"{html.escape(r.line)}", unsafe_allow_html=True)
-                    if st.button("Open →", key=f"lib{r.Index}"):
-                        st.query_params.clear()
-                        st.query_params["lib"] = r.id
-                        st.rerun()
-                continue
-            with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
-                st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
-                            f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
-                if st.button("Open →", key=f"srch{r.Index}"):
-                    f_ = DATA / "days" / f"{r.date}.json.gz"
-                    E_ = today if r.date == today["date"] else (load_day(r.date, f_.stat().st_mtime) if f_.exists() else None)
-                    s_ = next((x for x in (E_ or {}).get("stories", []) if x["id"] == r.story_id), None)
-                    j_ = next((k for k, x in enumerate((s_ or {}).get("studies", [])) if x.get("event") == r.event), None)
-                    if s_ is None or j_ is None or not ((s_.get("exhibits") or [None] * (j_ + 1))[j_]):
-                        st.caption("This study's full page is not available.")
-                    else:
-                        st.query_params.clear()
-                        st.query_params.update({"story": r.story_id, "v": str(j_),
-                                                **({"day": r.date} if r.date != today["date"] else {})})
-                        st.rerun()
-    else:
-        st.caption("The archive fills up as daily editions come out.")
+    search_ui()
 
 with tab_ask:
     st.markdown("Describe a move or a story you want studied: what happened, and to what (the market, a sector, one "
