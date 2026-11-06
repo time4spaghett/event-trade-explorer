@@ -89,6 +89,12 @@ def tally(vals):
     return len(v), sum(x > 0 for x in v), (float(np.mean(v)) if v else None), (float(np.median(v)) if v else None)
 
 
+def measure(X: dict) -> str:
+    """What a market exhibit's results are measured on, lower-cased for a sentence ("chip stocks", "the US stock average")."""
+    m_ = X.get("measure") or "The US stock average"
+    return m_[:1].lower() + m_[1:] if not m_.split(" ", 1)[0].isupper() else m_
+
+
 def trig(X: dict) -> str:
     """The event trigger in words, lower-cased to follow a colon ("a stock that tripled ...")."""
     t = (X.get("plain") or X["event"]).strip().rstrip(".")
@@ -111,7 +117,8 @@ def headline(X: dict, small: bool = False):
         yb = (f" · in the 12 months before, {X['subject']} {'beat' if y >= 0 else 'trailed'} the average S&amp;P 500 "
               f"stock by {abs(y) * 100:.0f}%")
     else:
-        yb = f" · in the 12 months before, the average US stock {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
+        m_ = measure(X)
+        yb = f" · in the 12 months before, {m_} {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
                 f"<div class='meta' style='margin:-.5rem 0 .8rem 0'>{when}{yb}</div>", unsafe_allow_html=True)
@@ -121,7 +128,7 @@ def boxes(X: dict):
     cs = X["cases"]
     n1, w1, a1, m1 = tally([c["after_21"] for c in cs])
     n2, w2, a2, m2 = tally([c["after_252"] for c in cs])
-    did = "beat the market" if X["kind"] == "stock" else "the market was up"
+    did = "beat the market" if X["kind"] == "stock" else f"{measure(X)} {'were' if measure(X).endswith('s') else 'was'} up"
     since = f"since {min(c['date'] for c in cs)[:4]}" if cs else "no past cases yet"
     first = "Stocks that did this before" if X["kind"] == "stock" else "Times this happened before"
     c1, c2, c3 = st.columns(3)
@@ -156,7 +163,7 @@ def overlay(X: dict, sel: set | None = None):
     fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                     name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
     fig.add_vline(x=0, line_color=DIM, line_dash="dot")
-    ylab = f"against {X['against']}, from the event day" if X["kind"] == "stock" else "the US stock average, from the event day"
+    ylab = f"against {X['against']}, from the event day" if X["kind"] == "stock" else f"{measure(X)}, from the event day"
     fig.update_layout(height=440, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef", legend=dict(orientation="h", y=1.08, x=0),
                       xaxis=dict(title="trading days from the event (0 = the day it happened)", gridcolor="#2a3140"),
@@ -252,7 +259,7 @@ def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
         b1, b2, _ = st.columns([1, 1.3, 5])
         if b1.button("More info →", key=f"open{i}"):
             st.query_params.clear()
-            st.query_params.update({"story": s["id"], "v": str(j)})
+            st.query_params.update({"story": s["id"], "v": str(j), **({"day": CUR_DAY} if CUR_DAY else {})})
             st.rerun()
         if n_also and b2.button(f"Similar cases ({n_also})", key=f"sim{i}"):
             st.query_params.update({"story": s["id"], "v": str(j), "view": "similar"})
@@ -301,11 +308,24 @@ st.markdown("<div class='mast'>Event-related Trade Explorer</div>", unsafe_allow
 if not today:
     st.info("The first daily edition is not out yet.")
     st.stop()
-st.markdown(f"<span class='meta'>{today['date']} · prices through {today.get('data_through')}</span>",
-            unsafe_allow_html=True)
-stories = today["stories"]
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_day(day_: str, stamp: float):
+    with gzip.open(DATA / "days" / f"{day_}.json.gz", "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+ed = today   # the edition on show: today's, or an older one opened from search (?day=)
+_dq = st.query_params.get("day")
+if _dq and _dq != today["date"] and (DATA / "days" / f"{_dq}.json.gz").exists():
+    ed = load_day(_dq, (DATA / "days" / f"{_dq}.json.gz").stat().st_mtime)
+CUR_DAY = None if ed is today else ed["date"]
+st.markdown(f"<span class='meta'>{ed['date']} · prices through {ed.get('data_through')}"
+            + (" · an earlier edition" if CUR_DAY else "") + "</span>", unsafe_allow_html=True)
+stories = ed["stories"]
 groups = [{"lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], j) for i, j in g["also"]]}
-          for g in today.get("front") or []]
+          for g in ed.get("front") or []]
 
 
 RECENT = bool(st.session_state.get("recent", False))   # the switch itself sits at the bottom of the page
@@ -413,6 +433,18 @@ with tab_search:
             with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
                 st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
                             f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
+                if st.button("Open →", key=f"srch{r.Index}"):
+                    f_ = DATA / "days" / f"{r.date}.json.gz"
+                    E_ = today if r.date == today["date"] else (load_day(r.date, f_.stat().st_mtime) if f_.exists() else None)
+                    s_ = next((x for x in (E_ or {}).get("stories", []) if x["id"] == r.story_id), None)
+                    j_ = next((k for k, x in enumerate((s_ or {}).get("studies", [])) if x.get("event") == r.event), None)
+                    if s_ is None or j_ is None or not ((s_.get("exhibits") or [None] * (j_ + 1))[j_]):
+                        st.caption("This study's full page is not available.")
+                    else:
+                        st.query_params.clear()
+                        st.query_params.update({"story": r.story_id, "v": str(j_),
+                                                **({"day": r.date} if r.date != today["date"] else {})})
+                        st.rerun()
     else:
         st.caption("The archive fills up as daily editions come out.")
 
