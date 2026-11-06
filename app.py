@@ -183,7 +183,7 @@ def full(s: dict, X: dict, also: list | None = None):
                                                            if r["pick"] in by else "–")} for r in L["picks_21"]]),
                      hide_index=True, use_container_width=True)
     if also:
-        st.markdown("**Additional event framings**")
+        st.markdown(f"### Similar cases to {html.escape(X['subject'])}")
         rows = []
         for (s2, j2, X2) in also:
             a, b = tally([c["after_21"] for c in X2["cases"]]), tally([c["after_252"] for c in X2["cases"]])
@@ -264,7 +264,8 @@ if s_open and ex(s_open, open_v):
         if st.button("← Back to today"):
             st.query_params.clear()
             st.rerun()
-        st.markdown("**Additional event framings**")
+        X0 = ex(s_open, open_v)
+        st.markdown(f"## Similar cases to {html.escape(X0['subject'])}")
         for k, (s2, j2, X2) in enumerate([(s_open, open_v, ex(s_open, open_v))] + others):
             card(s2, X2, 100 + k, j2, 0)
     else:
