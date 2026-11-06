@@ -183,8 +183,7 @@ def full(s: dict, X: dict, also: list | None = None):
                                                            if r["pick"] in by else "–")} for r in L["picks_21"]]),
                      hide_index=True, use_container_width=True)
     if also:
-        st.markdown("**Other versions of this move** (the story's other events, and other stories about the same thing): "
-                    "do they tell the same story?")
+        st.markdown("**Additional event framings**")
         rows = []
         for (s2, j2, X2) in also:
             a, b = tally([c["after_21"] for c in X2["cases"]]), tally([c["after_252"] for c in X2["cases"]])
@@ -193,7 +192,7 @@ def full(s: dict, X: dict, also: list | None = None):
                          f"1 month later": f"{a[1]} of {a[0]} {did}, middle case {pct(a[3])}" if a[0] else "–",
                          f"1 year later": f"{b[1]} of {b[0]} {did}, middle case {pct(b[3])}" if b[0] else "–"})
         st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-        pick = st.selectbox("Open another version", ["–"] + [r["version"] for r in rows], key=f"ver_{s['id']}")
+        pick = st.selectbox("Open a framing", ["–"] + [r["version"] for r in rows], key=f"ver_{s['id']}")
         if pick != "–":
             s2, j2, _ = also[[r["version"] for r in rows].index(pick)]
             st.query_params.update({"story": s2["id"], "v": str(j2)})
@@ -225,7 +224,7 @@ def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
     with st.container(border=True):
         headline(X, small=True)
         boxes(X)
-        extra = f" · also checked {n_also} other version{'s' if n_also > 1 else ''}" if n_also else ""
+        extra = ""
         st.markdown(f"<p class='news'>{html.escape(s['headline'])}<span class='meta'>{extra}</span></p>", unsafe_allow_html=True)
         b1, b2, _ = st.columns([1, 1.3, 5])
         if b1.button("More info →", key=f"open{i}"):
@@ -265,8 +264,7 @@ if s_open and ex(s_open, open_v):
         if st.button("← Back to today"):
             st.query_params.clear()
             st.rerun()
-        st.markdown("**Other versions of this move**, side by side: the same news cut different ways, and other "
-                    "stories about the same thing.")
+        st.markdown("**Additional event framings**")
         for k, (s2, j2, X2) in enumerate([(s_open, open_v, ex(s_open, open_v))] + others):
             card(s2, X2, 100 + k, j2, 0)
     else:
