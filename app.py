@@ -44,6 +44,18 @@ st.markdown("""<style>
 .why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
 .big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
 .box { background:#161b24; border:1px solid #2a3140; border-radius:8px; padding:.9rem 1.1rem; height:100%; }
+.onair { display:inline-flex; align-items:center; gap:.5rem; padding:.28rem .85rem .28rem .6rem; border:1.5px solid #e6e9ef;
+  border-radius:8px; font:700 .78rem/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing:.14em;
+  background:linear-gradient(180deg,#2a303b 0%,#151a22 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18), inset 0 -2px 4px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.5); vertical-align:middle; }
+.onair .led { width:.72rem; height:.72rem; border-radius:50%; box-shadow:inset 0 -1px 2px rgba(0,0,0,.5); }
+.onair.on { color:#7dffb0; text-shadow:0 0 6px rgba(63,220,127,.9); }
+.onair.on .led { background:radial-gradient(circle at 35% 30%,#d8ffe8 0%,#3fdc7f 45%,#0d7a3c 100%);
+  box-shadow:0 0 8px 2px rgba(63,220,127,.8), 0 0 18px 4px rgba(63,220,127,.35); animation:glow 1.8s ease-in-out infinite; }
+.onair.off { color:#8b929e; }
+.onair.off .led { background:radial-gradient(circle at 35% 30%,#9aa1ab 0%,#5a606a 55%,#2e333a 100%); }
+@keyframes glow { 0%,100% { box-shadow:0 0 6px 1px rgba(63,220,127,.7), 0 0 14px 3px rgba(63,220,127,.25); }
+                  50% { box-shadow:0 0 10px 3px rgba(63,220,127,.95), 0 0 24px 6px rgba(63,220,127,.45); } }
 .take { font-size:1.05rem; margin:.9rem 0 .6rem 0; padding:.6rem .9rem; border-left:3px solid #d9a441; background:#161b24; border-radius:0 6px 6px 0; }
 .take b { color:#d9a441; font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; display:block; margin-bottom:.15rem; }
 .news { color:#9aa3b2; font-size:.95rem; margin:.6rem 0 .2rem 0; }
@@ -123,15 +135,13 @@ def headline(X: dict, small: bool = False):
     if X.get("library"):
         active, last = lib_status(X)
         r_ = X.get("recent") or []
-        if active:
-            tag = "<span style='color:#3fb27f;font-size:.45em;font-weight:600;vertical-align:middle'>(active now)</span>"
-            line = f"Last happened {day(last)}" + (
-                f" · in the last week: {', '.join(r_[:10])}{' and others' if len(r_) > 10 else ''}" if r_ else "")
-        else:
-            tag = "<span style='color:#9aa3b2;font-size:.45em;font-weight:400;vertical-align:middle'>(currently inactive)</span>"
-            line = f"Last happened {day(last)}"
-        st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape((X['plain'] or X['event']).rstrip('.'))} {tag}</div>"
-                    f"<div class='meta' style='margin:.3rem 0 .8rem 0'>{line}</div>", unsafe_allow_html=True)
+        badge = (f"<span class='onair {'on' if active else 'off'}'><span class='led'></span>"
+                 f"{'ACTIVE' if active else 'INACTIVE'}</span>")
+        line = f"Last happened {day(last)}" + (
+            f" · in the last week: {', '.join(r_[:10])}{' and others' if len(r_) > 10 else ''}" if active and r_ else "")
+        st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape((X['plain'] or X['event']).rstrip('.'))}</div>"
+                    f"<div style='margin:.55rem 0 .9rem 0'>{badge}<span class='meta' style='margin-left:.8rem'>{line}</span></div>",
+                    unsafe_allow_html=True)
         return
     when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
             else f"Last happened {day(X['event_date'])}" if X.get("library") else f"Happened {day(X['event_date'])}")
