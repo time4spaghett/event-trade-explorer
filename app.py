@@ -31,7 +31,7 @@ st.markdown("""<style>
 :root { --bg:#0e1117; --panel:#161b24; --line:#2a3140; --ink:#e6e9ef; --dim:#9aa3b2; --up:#3fb27f; --down:#e5534b;
         --accent:#d9a441; }
 .stApp { background: var(--bg); color: var(--ink); }
-.block-container { padding-top: 1.2rem; max-width: 1100px; }
+.block-container { padding-top: 3.6rem; max-width: 1100px; }
 .chiron { overflow: hidden; white-space: nowrap; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
           background: #11161f; padding: .45rem 0; margin: .3rem 0 1.2rem 0; }
 .chiron span.run { display: inline-block; padding-left: 100%; animation: roll 90s linear infinite; }
