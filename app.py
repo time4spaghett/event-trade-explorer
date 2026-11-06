@@ -1,6 +1,7 @@
-"""Event-related Trade Explorer: the daily event-study page (Alex 2026-11-05): today's news-based event studies in a scrolling ticker and cards,
-search over the event-study archive, and a box to commission a new study by email. Hosted like Blackbird
-(sharadar/search_site): reads only this folder's data/ (export.py writes it locally each morning).
+"""Event-related Trade Explorer: the daily event-study page (Alex 2026-11-05). The front page is today's top 5 news
+stories as short exhibit cards (Alex 2026-11-06: the stock-led MU exhibit's format), the rest under "Load more";
+each card opens its full exhibit (?story=<id>, a link people can share). Also: search over the event-study archive,
+and a box to commission a new study by email. Reads only this folder's data/ (export.py writes it each morning).
 
 Run: C:\\Python310\\python.exe -m streamlit run sharadar\\event_site\\app.py
 Secrets (.streamlit/secrets.toml on the host; all optional locally): password, request_email.
@@ -13,39 +14,37 @@ import hmac
 import html
 import json
 import os
-import re
 from pathlib import Path
 from urllib.parse import quote
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
-HOLDS = {"21": "1 month", "252": "1 year"}
+TOP = 5
 NOT_ADVICE = "History, not investment advice. Past results do not tell you what happens next."
+GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
+PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98c379", "#ff9e64"]  # ticked cases
 
 st.set_page_config(page_title="Event-related Trade Explorer", layout="wide")
 st.markdown("""<style>
-:root { --bg:#0e1117; --panel:#161b24; --line:#2a3140; --ink:#e6e9ef; --dim:#9aa3b2; --up:#3fb27f; --down:#e5534b;
-        --accent:#d9a441; }
-.stApp { background: var(--bg); color: var(--ink); }
-.block-container { padding-top: 3.6rem; max-width: 1100px; }
-.chiron { overflow: hidden; white-space: nowrap; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-          background: #11161f; padding: .45rem 0; margin: .3rem 0 1.2rem 0; }
-.chiron span.run { display: inline-block; padding-left: 100%; animation: roll 90s linear infinite; }
-.chiron:hover span.run { animation-play-state: paused; }
-.chiron b { color: var(--accent); font-weight: 600; margin-right: .4rem; }
-.chiron i { color: var(--dim); font-style: normal; margin: 0 2.2rem 0 .3rem; }
-@keyframes roll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
-.card h3 { margin: 0 0 .3rem 0; font-size: 1.25rem; }
-.meta { color: var(--dim); font-size: .85rem; }
-.ev { border-left: 3px solid var(--accent); padding-left: .8rem; margin-top: .9rem; }
-.num { font-size: 1.5rem; font-weight: 600; }
-.up { color: var(--up); } .down { color: var(--down); }
-.mast { font-family: Georgia, serif; font-size: 2.1rem; letter-spacing: .02em; margin: 0; }
+.stApp { background:#0e1117; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
+.chiron { overflow:hidden; white-space:nowrap; border-top:1px solid #2a3140; border-bottom:1px solid #2a3140;
+          background:#11161f; padding:.45rem 0; margin:.3rem 0 1.2rem 0; }
+.chiron span.run { display:inline-block; padding-left:100%; animation:roll 90s linear infinite; }
+.chiron:hover span.run { animation-play-state:paused; }
+.chiron b { color:#d9a441; font-weight:600; margin-right:.4rem; } .chiron i { color:#9aa3b2; font-style:normal; margin:0 2.2rem 0 .3rem; }
+@keyframes roll { from { transform:translateX(0); } to { transform:translateX(-100%); } }
+.mast { font-family:Georgia, serif; font-size:2.1rem; letter-spacing:.02em; margin:0; }
+.tk { font-family:Georgia, serif; font-size:3rem; line-height:1.05; margin:0; }
+.tk.small { font-size:2.2rem; }
+.why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
+.big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
+.box { background:#161b24; border:1px solid #2a3140; border-radius:8px; padding:.9rem 1.1rem; height:100%; }
+.news { color:#9aa3b2; font-size:.95rem; margin:.6rem 0 .2rem 0; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -77,81 +76,143 @@ def load(stamp: tuple):  # stamp = the data files' change times, so a new editio
     return t, a
 
 
-def pct(x, sign=True) -> str:
-    if x is None or (isinstance(x, float) and pd.isna(x)):
-        return "–"
-    return f"{x * 100:+.1f}%" if sign else f"{x * 100:.1f}%"
+def pct(x):
+    return "–" if x is None or (isinstance(x, float) and np.isnan(x)) else f"{x * 100:+.0f}%"
 
 
-def cls(x) -> str:
-    return "" if x is None else ("up" if x > 0 else "down" if x < 0 else "")
+def cls(x):
+    return "" if x is None else ("up" if x > 0 else "down")
 
 
-def after_line(lead: dict, kind: str) -> str:
-    """'1 month later: +2.1% on average, higher in 9 of 14' for the market (or the stocks, for a stock event)."""
-    who = "the stocks beat the market by" if kind == "stock" else "the market moved"
-    parts = []
-    for h, name in HOLDS.items():
-        a = lead.get(f"after_{h}") or {}
-        if a.get("n"):
-            parts.append(f"{name} later {who} <span class='{cls(a.get('avg'))}'>{pct(a.get('avg'))}</span> on "
-                         f"average ({'ahead' if kind == 'stock' else 'up'} in {a.get('won')} of {a['n']})")
-    return "; ".join(parts) or "too few past cases to show"
+def tally(vals):
+    v = [float(x) for x in vals if x is not None and np.isfinite(x)]
+    return len(v), sum(x > 0 for x in v), (float(np.mean(v)) if v else None), (float(np.median(v)) if v else None)
 
 
-def picks_chart(lead: dict, key: str):
+def headline(X: dict, small: bool = False):
+    when = (f"today's move is not in our prices yet (through {X['data_through']})" if X.get("pending")
+            else X["event_date"])
+    yb = (f"; {pct(X['year_before'])} against {X['against']} in the year before" if X["kind"] == "stock"
+          else f"; the US stock average {pct(X['year_before'])} in the year before")
+    st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
+                f"<div class='why'>{html.escape(X['plain'] or X['event'])} <span class='meta'>({when}{yb})</span></div>",
+                unsafe_allow_html=True)
+
+
+def boxes(X: dict):
+    cs = X["cases"]
+    n1, w1, a1, m1 = tally([c["after_21"] for c in cs])
+    n2, w2, a2, m2 = tally([c["after_252"] for c in cs])
+    did = "beat the market" if X["kind"] == "stock" else "the market was up"
+    since = f"since {min(c['date'] for c in cs)[:4]}" if cs else "no past cases yet"
+    first = "Stocks that did this before" if X["kind"] == "stock" else "Times this happened before"
+    c1, c2, c3 = st.columns(3)
+    c1.markdown(f"<div class='box'><span class='meta'>{first}</span><br><span class='big'>{len(cs)}</span><br>"
+                f"<span class='meta'>{since}</span></div>", unsafe_allow_html=True)
+    for col, name, n, w, a, m in ((c2, "1 month", n1, w1, a1, m1), (c3, "1 year", n2, w2, a2, m2)):
+        col.markdown(f"<div class='box'><span class='meta'>{name} later, {did}</span><br><span class='big'>"
+                     f"{f'{w} of {n}' if n else '–'}</span><br><span class='meta'>typical result <span class='{cls(m)}'>"
+                     f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
+
+
+def overlay(X: dict, sel: set | None = None):
+    """sel: case numbers ticked in the table; when some are ticked only those past cases are drawn."""
+    step, B = X["step"], X["before"]
+    x = np.arange(-B, X["after"] + 1, step)
+    p0 = X.get("paths_from", 0)
+    P = np.array([[np.nan if v is None else v for v in p] for p in X["paths"]], float).reshape(-1, len(x))
     fig = go.Figure()
-    colors = {"21": "#d9a441", "252": "#5b8def"}
-    names = None
-    for h, name in HOLDS.items():
-        rows = lead.get(f"picks_{h}") or []
-        if not rows:
+    for i, p in enumerate(P):
+        c = X["cases"][p0 + i]
+        lab = f"{c['who']} {c['date']}".strip()
+        if sel and p0 + i not in sel:
             continue
-        if names is None:
-            names = [r["pick"] for r in sorted(rows, key=lambda r: r.get("avg") or 0)]
-        by = {r["pick"]: r for r in rows}
-        fig.add_bar(y=names, x=[(by.get(n) or {}).get("avg") for n in names], orientation="h", name=name,
-                    marker_color=colors[h],
-                    customdata=[[(by.get(n) or {}).get("won"), (by.get(n) or {}).get("n")] for n in names],
-                    hovertemplate="%{y}: %{x:+.1%} vs the market, ahead in %{customdata[0]} of %{customdata[1]}<extra>"
-                                  + name + "</extra>")
-    if names is None:
-        st.caption("No pick comparison yet: too few past cases.")
-        return
-    fig.update_layout(barmode="group", height=40 + 34 * len(names), margin=dict(l=0, r=10, t=10, b=10),
-                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef",
-                      xaxis=dict(tickformat="+.0%", gridcolor="#2a3140", zerolinecolor="#9aa3b2"),
-                      legend=dict(orientation="h", y=1.08, x=0))
-    st.plotly_chart(fig, use_container_width=True, key=key, config={"displayModeBar": False})
+        fig.add_scatter(x=x, y=p, mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
+                        line=dict(color=PICKED[len(fig.data) % len(PICKED)] if sel else "rgba(154,163,178,.18)", width=2 if sel else 1))
+    if len(P):
+        ok = np.isfinite(P).sum(0) >= 5
+        with np.errstate(all="ignore"):
+            med = np.where(ok, np.nanmedian(P, axis=0), np.nan)
+        fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="the typical past case")
+    s = np.array([np.nan if v is None else v for v in X["path"]], float)
+    fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
+                    name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
+    fig.add_vline(x=0, line_color=DIM, line_dash="dot")
+    ylab = f"against {X['against']}, from the event day" if X["kind"] == "stock" else "the US stock average, from the event day"
+    fig.update_layout(height=440, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
+                      plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef", legend=dict(orientation="h", y=1.08, x=0),
+                      xaxis=dict(title="trading days from the event (0 = the day it happened)", gridcolor="#2a3140"),
+                      yaxis=dict(title=ylab, tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    more = f" Only the {len(P)} newest past cases have a line." if X.get("paths_from") else ""
+    st.caption(("Showing the past cases ticked in the table below. " if sel else
+                "Each grey line is one past case; tick cases in the table below to show only those. ")
+               + "The blue line is the middle of all past cases on each day. Left of 0 is the lead-up; right of 0 is "
+               "what came after." + more)
 
 
-def study_block(stu: dict, key: str):
-    st.markdown(f"<div class='ev'><b>{html.escape(stu.get('plain') or stu['event'])}</b><br>"
-                f"<span class='meta'><code>{html.escape(stu['event'])}</code> · {stu.get('past_cases', 0)} past cases"
-                + (" · fired this week" if stu.get("fired_recently") else "") + "</span><br>"
-                f"{after_line(stu.get('lead') or {}, stu['kind'])}</div>", unsafe_allow_html=True)
-    if stu.get("error"):
-        st.caption(f"Could not study this event: {stu['error']}")
-        return
-    st.markdown("<span class='meta'>Which kind of stock did best after it, against the market (top fifth of the "
-                "S&amp;P 500 on each ranking)</span>", unsafe_allow_html=True)
-    picks_chart(stu.get("lead") or {}, key)
-    h = stu.get("history") or {}
-    with st.expander("Past cases"):
-        if stu["kind"] == "stock":
-            st.write("Firings by year: " + ", ".join(f"{y}: {n}" for y, n in (h.get("by_year") or {}).items()))
-        else:
-            cs = [c for c in h.get("cases", []) if not c.get("pending")]
-            if cs:
-                df = pd.DataFrame([{"date": c["date"], "market 1 month later": c.get("mkt_21"),
-                                    "market 1 year later": c.get("mkt_252")} for c in cs][::-1])
-                st.dataframe(df.style.format({c: "{:+.1%}" for c in df.columns if c != "date"}, na_rep="pending"),
-                             hide_index=True, use_container_width=True)
-    if stu.get("today"):
-        with st.expander(f"Stocks that did this in the last week ({len(stu['today'])})"):
-            st.dataframe(pd.DataFrame([{"ticker": t["ticker"], "date": t["date"], "rankings it sits in":
-                                        ", ".join(p.split(" (")[0] for p in t["picks"])} for t in stu["today"]]),
-                         hide_index=True, use_container_width=True)
+def full(s: dict, X: dict):
+    if st.button("← Back to today"):
+        st.query_params.clear()
+        st.rerun()
+    headline(X)
+    boxes(X)
+    who = X["subject"] if X["kind"] == "stock" else "Now"
+    st.markdown(f"**{who} against the {len(X['cases'])} past cases**")
+    chart = st.container()   # drawn after the table, so the ticks in the table choose its lines
+    cases = pd.DataFrame(X["cases"])
+    sel: set = set()
+    if X.get("rankings"):
+        st.markdown(f"**Past cases that were also {', '.join(k.split(' (')[0] for k in X['rankings'])}, like {X['subject']}**")
+        rows = []
+        for k, idx in X["rankings"].items():
+            sub = cases.iloc[idx] if idx else cases.iloc[0:0]
+            a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
+            rows.append({"ranking": k, "past cases": len(sub),
+                         "1 month later: beat the market": f"{a[1]} of {a[0]}" if a[0] else "–", "1 month, typical": pct(a[3]),
+                         "1 year later: beat the market": f"{b[1]} of {b[0]}" if b[0] else "–", "1 year, typical": pct(b[3])})
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
+        st.markdown("**Which kind of stock did best after it, against the market** (top fifth of the S&P 500 on each ranking)")
+        L = X["lead"]
+        by = {r["pick"]: r for r in L.get("picks_252") or []}
+        st.dataframe(pd.DataFrame([{"ranking": r["pick"], "1 month later": pct(r.get("avg")),
+                                    "ahead after 1 month": f"{r.get('won')} of {r.get('n')}",
+                                    "1 year later": pct((by.get(r["pick"]) or {}).get("avg")),
+                                    "ahead after 1 year": (f"{by[r['pick']].get('won')} of {by[r['pick']].get('n')}"
+                                                           if r["pick"] in by else "–")} for r in L["picks_21"]]),
+                     hide_index=True, use_container_width=True)
+    if len(cases):
+        st.markdown("**Every past case** (tick any to show only those in the chart)")
+        cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
+        t = cases[cols].sort_values("date", ascending=False)
+        for c in ("year_before", "after_21", "after_252"):
+            t[c] = t[c].map(pct)
+        t = t.rename(columns={"who": "ticker", "year_before": "year before", "after_21": "1 month later",
+                              "after_252": "1 year later"})
+        ev = st.dataframe(t, hide_index=True, use_container_width=True, key=f"pick_{s['id']}",
+                          on_select="rerun", selection_mode="multi-row")
+        rows = ev.selection.rows if ev and ev.selection else []
+        sel = set(int(t.index[r]) for r in rows)
+    with chart:
+        overlay(X, sel)
+    st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
+                unsafe_allow_html=True)
+    src = " · ".join(f"<a href='{html.escape(x.get('url', ''))}' target='_blank'>{html.escape(x.get('title') or 'source')}</a>"
+                     for x in s.get("sources", [])[:3])
+    st.markdown(f"<span class='meta'>{src}<br>The rule: <code>{html.escape(X['event'])}</code>. Returns are against "
+                f"{X['against']} (each S&amp;P 500 stock counted the same, financials out), bought at the next close. "
+                f"Prices through {X['data_through']}. {NOT_ADVICE}</span>", unsafe_allow_html=True)
+
+
+def card(s: dict, X: dict, i: int):
+    with st.container(border=True):
+        headline(X, small=True)
+        boxes(X)
+        st.markdown(f"<p class='news'>{html.escape(s['headline'])}</p>", unsafe_allow_html=True)
+        if st.button("See the history →", key=f"open{i}"):
+            st.query_params["story"] = s["id"]
+            st.rerun()
 
 
 today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
@@ -160,35 +221,38 @@ st.markdown("<p class='mast'>Event-related Trade Explorer</p>", unsafe_allow_htm
 if not today:
     st.info("The first daily edition is not out yet.")
     st.stop()
-st.markdown(f"<span class='meta'>{today['date']} · prices through {today.get('data_through')} · "
-            f"{NOT_ADVICE}</span>", unsafe_allow_html=True)
+st.markdown(f"<span class='meta'>{today['date']} · prices through {today.get('data_through')} · {NOT_ADVICE}</span>",
+            unsafe_allow_html=True)
+stories = [s for s in today["stories"] if s.get("exhibit")]
+
+open_id = st.query_params.get("story")
+s_open = next((s for s in stories if s["id"] == open_id), None)
+if s_open:
+    full(s_open, s_open["exhibit"])
+    st.stop()
 
 items = []
-for s in today["stories"]:
-    stu = next((x for x in s.get("studies", []) if not x.get("error")), None)
-    tail = ""
-    if stu:
-        a = (stu.get("lead") or {}).get("after_21") or {}
-        if a.get("n"):
-            tail = (f"after {a['n']} similar cases, {'those stocks' if stu['kind'] == 'stock' else 'the market'} "
-                    f"averaged {pct(a.get('avg'))} a month later")
+for s in stories[:TOP]:
+    X = s["exhibit"]
+    n, w, _, _ = tally([c["after_21"] for c in X["cases"]])
+    tail = (f"{X['subject']}: {w} of {n} past cases {'beat the market' if X['kind'] == 'stock' else 'saw the market up'}"
+            f" a month later") if n else ""
     items.append(f"<b>{html.escape(s['headline'])}</b><i>{html.escape(tail)}</i>")
 st.markdown(f"<div class='chiron'><span class='run'>{''.join(items)}</span></div>", unsafe_allow_html=True)
 
 tab_today, tab_search, tab_ask = st.tabs(["Today", "Search the archive", "Commission a study"])
 
 with tab_today:
-    for i, s in enumerate(today["stories"]):
-        src = " · ".join(f"<a href='{html.escape(x.get('url', ''))}' target='_blank'>{html.escape(x.get('title') or 'source')}</a>"
-                         for x in s.get("sources", [])[:3])
-        st.markdown(f"<div class='card'><h3>{html.escape(s['headline'])}</h3>"
-                    f"<span class='meta'>{s.get('date', '')}"
-                    + (f" · {', '.join(map(html.escape, s.get('tickers', [])))}" if s.get("tickers") else "")
-                    + (f" · {src}" if src else "") + f"</span><p>{html.escape(s.get('summary', ''))}</p></div>",
-                    unsafe_allow_html=True)
-        for j, stu in enumerate(s.get("studies", [])):
-            study_block(stu, key=f"t{i}_{j}")
-        st.divider()
+    for i, s in enumerate(stories[:TOP]):
+        card(s, s["exhibit"], i)
+    rest = stories[TOP:]
+    if rest:
+        if st.session_state.get("more"):
+            for i, s in enumerate(rest, start=TOP):
+                card(s, s["exhibit"], i)
+        elif st.button(f"Load more ({len(rest)})"):
+            st.session_state.more = True
+            st.rerun()
 
 with tab_search:
     q = st.text_input("Search past event studies", placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
@@ -199,16 +263,21 @@ with tab_search:
         if q.strip():
             from sklearn.feature_extraction.text import TfidfVectorizer
             vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
-            X = vec.fit_transform(df.text)
-            s_ = (X @ vec.transform([q]).T).toarray().ravel()
-            df = df.assign(score=s_)
+            M = vec.fit_transform(df.text)
+            df = df.assign(score=(M @ vec.transform([q]).T).toarray().ravel())
             df = df[df.score > 0].sort_values("score", ascending=False)
         st.caption(f"{len(df)} studies" + (" match" if q.strip() else " so far, newest first"))
-        for k, r in enumerate(df.head(30).itertuples()):
+        for r in df.head(30).itertuples():
+            lead = r.lead or {}
+            parts = []
+            for h, name in (("21", "1 month"), ("252", "1 year")):
+                a = lead.get(f"after_{h}") or {}
+                if a.get("n"):
+                    parts.append(f"{name} later: {'ahead' if r.kind == 'stock' else 'up'} in {a.get('won')} of {a['n']} "
+                                 f"(average {pct(a.get('avg'))})")
             with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
                 st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
-                            f"{after_line(r.lead or {}, r.kind)}", unsafe_allow_html=True)
-                picks_chart(r.lead or {}, key=f"s{k}")
+                            f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
     else:
         st.caption("The archive fills up as daily editions come out.")
 
