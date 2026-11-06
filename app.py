@@ -259,6 +259,42 @@ def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
             st.rerun()
 
 
+MAX_SEARCHES = 40   # per visitor session, so one visitor cannot run up the bill
+
+
+def word_search(q: str, texts: tuple, top: int | None = None) -> list:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+    M = vec.fit_transform(texts)
+    sc = (M @ vec.transform([q]).T).toarray().ravel()
+    idx = [int(i) for i in np.argsort(-sc) if sc[i] > 0]
+    return idx[:top] if top else idx
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def haiku_search(q: str, texts: tuple, key: str) -> list:
+    """Claude Haiku reads the query and the archive (one line per study) and returns the matching rows, best first.
+    A large archive is cut to the 300 best word matches plus the 100 newest first. Cached for an hour per query."""
+    import anthropic
+    ids = list(range(len(texts)))
+    if len(ids) > 400:
+        ids = sorted(set(word_search(q, texts, 300)) | set(range(100)))
+    lines = "\n".join(f"{i}: {texts[i][:300]}" for i in ids)
+    r = anthropic.Anthropic(api_key=key).messages.create(
+        model="claude-haiku-5-5", max_tokens=2000, output_config={"effort": "low", "format": {"type": "json_schema", "schema": {
+            "type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}}},
+            "required": ["ids"], "additionalProperties": False}}},
+        messages=[{"role": "user", "content": (
+            "You search an archive of market event studies. Each line is one study: its number, then the news "
+            "headline, summary, the event in words, the event rule and tickers. Return the numbers of the studies "
+            "that match what the user is looking for, best match first, at most 30. Match on meaning (a 'chip "
+            "crash' matches semiconductor sell-offs), not just words. Return an empty list if nothing fits.\n\n"
+            f"Search: {q}\n\nStudies:\n{lines}")}])
+    out = json.loads(next(b.text for b in r.content if b.type == "text"))["ids"]
+    ok = set(ids)
+    return [i for i in dict.fromkeys(out) if i in ok]
+
+
 today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
 
 st.markdown("<div class='mast'>Event-related Trade Explorer</div>", unsafe_allow_html=True)
@@ -348,14 +384,23 @@ with tab_search:
     q = st.text_input("Search past event studies", placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
     if archive:
         df = pd.DataFrame(archive)
+        df = df.drop_duplicates(["story_id", "event"]).reset_index(drop=True)   # a story kept for days: newest copy
         df["text"] = (df.headline.fillna("") + " " + df.summary.fillna("") + " " + df.plain.fillna("") + " "
                       + df.event.fillna("") + " " + df.tickers.apply(lambda t: " ".join(t or [])))
         if q.strip():
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
-            M = vec.fit_transform(df.text)
-            df = df.assign(score=(M @ vec.transform([q]).T).toarray().ravel())
-            df = df[df.score > 0].sort_values("score", ascending=False)
+            key = secret("anthropic_api_key")
+            n_q = st.session_state.get("n_search", 0)
+            order = None
+            if key and n_q < MAX_SEARCHES:
+                st.session_state.n_search = n_q + 1
+                try:
+                    with st.spinner("Searching ..."):
+                        order = haiku_search(q.strip(), tuple(df.text), key)
+                except Exception as exc:  # noqa: BLE001  (any API trouble: fall back to word matching)
+                    st.caption(f"Smart search is down ({type(exc).__name__}); matching words instead.")
+            if order is None:
+                order = word_search(q, tuple(df.text))
+            df = df.iloc[order]
         st.caption(f"{len(df)} studies" + (" match" if q.strip() else " so far, newest first"))
         for r in df.head(30).itertuples():
             lead = r.lead or {}
