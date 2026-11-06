@@ -129,7 +129,7 @@ def boxes(X: dict):
                 f"<span class='meta'>{since}</span></div>", unsafe_allow_html=True)
     for col, name, n, w, a, m in ((c2, "1 month", n1, w1, a1, m1), (c3, "1 year", n2, w2, a2, m2)):
         col.markdown(f"<div class='box'><span class='meta'>{name} later, {did}</span><br><span class='big'>"
-                     f"{f'{w} of {n}' if n else '–'}</span><br><span class='meta'>middle case <span class='{cls(m)}'>"
+                     f"{f'{w} of {n}' if n else '–'}</span><br><span class='meta'>median <span class='{cls(m)}'>"
                      f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
 
 
@@ -151,7 +151,7 @@ def overlay(X: dict, sel: set | None = None):
         ok = np.isfinite(P).sum(0) >= 5
         with np.errstate(all="ignore"):
             med = np.where(ok, np.nanmedian(P, axis=0), np.nan)
-        fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="the middle past case")
+        fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
     fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                     name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
@@ -165,7 +165,7 @@ def overlay(X: dict, sel: set | None = None):
     more = f" Only the {len(P)} newest past cases have a line." if X.get("paths_from") else ""
     st.caption(("Showing the past cases ticked in the table below. " if sel else
                 "Each grey line is one past case; tick cases in the table below to show only those. ")
-               + "The blue line is the middle past case on each day. Left of 0 is the lead-up; right of 0 is "
+               + "The blue line is the median past case on each day. Left of 0 is the lead-up; right of 0 is "
                "what came after." + more)
 
 
@@ -202,7 +202,7 @@ def full(s: dict, X: dict, also: list | None = None):
     sel: set = set()
     if X.get("rankings"):
         st.markdown(f"**Past cases that were also {', '.join(k.split(' (')[0] for k in X['rankings'])}, like "
-                    f"{html.escape(X['subject'])}** (middle case against the market)")
+                    f"{html.escape(X['subject'])}** (median against the market)")
         rows = []
         for k, idx in X["rankings"].items():
             sub = cases.iloc[idx] if idx else cases.iloc[0:0]
