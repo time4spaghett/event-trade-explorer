@@ -111,9 +111,12 @@ def day(d: str) -> str:
 
 def headline(X: dict, small: bool = False):
     when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
-            else f"Happened {day(X['event_date'])}")
+            else f"Last happened {day(X['event_date'])}" if X.get("library") else f"Happened {day(X['event_date'])}")
     y = X.get("year_before")
-    if y is None:
+    if X.get("library") and X["kind"] == "stock":
+        r_ = X.get("recent") or []
+        yb = (f" · in the last week: {', '.join(r_[:10])}{' and others' if len(r_) > 10 else ''}" if r_ else "")
+    elif y is None:
         yb = ""
     elif X["kind"] == "stock":
         yb = (f" · in the 12 months before, {X['subject']} {'beat' if y >= 0 else 'trailed'} the average S&amp;P 500 "
@@ -180,7 +183,7 @@ def boxes(X: dict):
                      f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
 
 
-def overlay(X: dict, sel: set | None = None):
+def overlay(X: dict, sel: set | None = None, extra: tuple | None = None):
     """sel: case numbers ticked in the table; when some are ticked only those past cases are drawn."""
     step, B = X["step"], X["before"]
     x = np.arange(-B, X["after"] + 1, step)
@@ -208,14 +211,26 @@ def overlay(X: dict, sel: set | None = None):
                             fillcolor="rgba(91,141,239,.30)", name="80% of past cases", hoverinfo="skip")
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
-    fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
-                    name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
+    if np.isfinite(s).any():
+        fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
+                        name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
+    if extra:   # a reader's stock, its last year up to today (0 = today)
+        lab, xo, yo = extra
+        fig.add_scatter(x=xo, y=[np.nan if v is None else v for v in yo], mode="lines", line=dict(color=GOLD, width=4),
+                        name=f"{lab} (to {X['data_through']}, 0 = today)")
     fig.add_vline(x=0, line_color=DIM, line_dash="dot")
+    yr = None
+    if len(P) and not sel:   # fit the scale to the 80% band (with room), so a few extreme cases do not squash it
+        with np.errstate(all="ignore"):
+            lo_, hi_ = np.nanmin(np.nanpercentile(P, 5, axis=0)), np.nanmax(np.nanpercentile(P, 95, axis=0))
+        if np.isfinite(lo_) and np.isfinite(hi_):
+            pad = (hi_ - lo_) * 0.15
+            yr = [lo_ - pad, hi_ + pad]
     ylab = f"against {X['against']}, from the event day" if X["kind"] == "stock" else f"{measure(X)}, from the event day"
     fig.update_layout(height=440, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef", legend=dict(orientation="h", y=1.08, x=0),
                       xaxis=dict(title="trading days from the event (0 = the day it happened)", gridcolor="#2a3140"),
-                      yaxis=dict(title=ylab, tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM))
+                      yaxis=dict(title=ylab, tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM, range=yr))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     more = f" Only the {len(P)} newest past cases have a line." if X.get("paths_from") else ""
     st.caption(("Showing the past cases ticked in the table below. " if sel else
@@ -251,8 +266,21 @@ def full(s: dict, X: dict, also: list | None = None):
     headline(X)
     boxes(X)
     take_box(X)
-    who = X["subject"] if X["kind"] == "stock" else "Now"
-    st.markdown(f"**{who} against the {len(X['cases'])} past cases**")
+    who = "Now" if X["kind"] != "stock" else ("The past cases" if X.get("library") else X["subject"])
+    st.markdown(f"**{who} against the {len(X['cases'])} past cases**" if not X.get("library") or X["kind"] != "stock"
+                else f"**The {len(X['cases'])} past cases**")
+    extra = None
+    if X.get("library") and X["kind"] == "stock":
+        ov = load_overlay()
+        tk = st.text_input("Overlay a stock (S&P 500 ticker): its last year up to today", key=f"ov_{X.get('id')}").strip().upper()
+        if tk:
+            if ov and tk in ov["series"]:
+                extra = (tk, ov["offsets"], ov["series"][tk])
+                if tk not in (X.get("recent") or []):
+                    st.warning(f"{tk} has not passed this filter in the last week, so it is being compared with cases it "
+                               "does not match.", icon="⚠️")
+            else:
+                st.warning(f"{tk} is not in the current S&P 500 price file.", icon="⚠️")
     chart = st.container()   # drawn after the table, so the ticks in the table choose its lines
     cases = pd.DataFrame(X["cases"])
     sel: set = set()
@@ -289,9 +317,10 @@ def full(s: dict, X: dict, also: list | None = None):
         st.query_params.update({"view": "similar"})
         st.rerun()
     with chart:
-        overlay(X, sel)
-    st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
-                unsafe_allow_html=True)
+        overlay(X, sel, extra)
+    if s.get("headline"):
+        st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
+                    unsafe_allow_html=True)
     src = " · ".join(f"<a href='{html.escape(x.get('url', ''))}' target='_blank'>{html.escape(x.get('title') or 'source')}</a>"
                      for x in s.get("sources", [])[:3])
     st.markdown(f"<span class='meta'>{src}<br>The rule: <code>{html.escape(X['event'])}</code>. Returns are against "
@@ -360,6 +389,37 @@ if not today:
     st.stop()
 
 
+LIB = DATA / "library"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_lib_index(stamp: float) -> list:
+    with gzip.open(DATA / "library_index.json.gz", "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_lib(pid: str, stamp: float) -> dict:
+    with gzip.open(LIB / f"{pid}.json.gz", "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _overlay(stamp: float) -> dict:
+    with gzip.open(DATA / "overlay.json.gz", "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def load_overlay():
+    f = DATA / "overlay.json.gz"
+    return _overlay(f.stat().st_mtime) if f.exists() else None
+
+
+def lib_index() -> list:
+    f = DATA / "library_index.json.gz"
+    return load_lib_index(f.stat().st_mtime) if f.exists() else []
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_day(day_: str, stamp: float):
     with gzip.open(DATA / "days" / f"{day_}.json.gz", "rt", encoding="utf-8") as fh:
@@ -403,6 +463,21 @@ def trim(X: dict | None) -> dict | None:
 def ex(s, j):
     return trim((s.get("exhibits") or [None])[j]) if j < len(s.get("exhibits") or []) else None
 
+
+lib_id = st.query_params.get("lib")
+if lib_id and (LIB / f"{lib_id}.json.gz").exists():
+    XL = trim(load_lib(lib_id, (LIB / f"{lib_id}.json.gz").stat().st_mtime))
+    full({"id": lib_id}, XL)
+    sib = [r for r in lib_index() if r["qid"] == XL.get("qid") and r["id"] != lib_id]
+    if sib:
+        st.markdown(f"### Similar cases: {html.escape(XL['subject'])}")
+        for r in sib:
+            if st.button(f"{r['plain']} ({r['past_cases']} past cases) →", key=f"sib{r['id']}"):
+                st.query_params.clear()
+                st.query_params["lib"] = r["id"]
+                st.rerun()
+    recent_switch()
+    st.stop()
 
 open_id, open_v = st.query_params.get("story"), int(st.query_params.get("v", 0) or 0)
 s_open = next((s for s in stories if s["id"] == open_id), None)
@@ -453,8 +528,13 @@ with tab_today:
 with tab_search:
     q = st.text_input("Search past event studies", placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
     if archive:
-        df = pd.DataFrame(archive)
+        df = pd.DataFrame(archive).assign(src="news")
         df = df.drop_duplicates(["story_id", "event"]).reset_index(drop=True)   # a story kept for days: newest copy
+        li = lib_index()
+        if li:   # the library: base-rate questions people look up (library_gen.py / library_build.py)
+            L = pd.DataFrame(li).assign(src="library", headline=lambda d: d.title, summary="", tickers=[[]] * len(li),
+                                        story_id=None, date="library", lead=None)
+            df = pd.concat([df, L], ignore_index=True)
         df["text"] = (df.headline.fillna("") + " " + df.summary.fillna("") + " " + df.plain.fillna("") + " "
                       + df.event.fillna("") + " " + df.tickers.apply(lambda t: " ".join(t or [])))
         if q.strip():
@@ -480,6 +560,15 @@ with tab_search:
                 if a.get("n"):
                     parts.append(f"{name} later: {'ahead' if r.kind == 'stock' else 'up'} in {a.get('won')} of {a['n']} "
                                  f"(average {pct(a.get('avg'))})")
+            if r.src == "library":
+                with st.expander(f"Library · {r.headline} — {r.plain}"):
+                    st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
+                                f"{html.escape(r.line)}", unsafe_allow_html=True)
+                    if st.button("Open →", key=f"lib{r.Index}"):
+                        st.query_params.clear()
+                        st.query_params["lib"] = r.id
+                        st.rerun()
+                continue
             with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
                 st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
                             f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
