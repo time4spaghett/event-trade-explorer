@@ -169,6 +169,26 @@ def overlay(X: dict, sel: set | None = None):
                "what came after." + more)
 
 
+def bars(rows: list, did: str):
+    """rows: (ranking, (value, won, n) at 1 month, (value, won, n) at 1 year); grouped horizontal bars."""
+    rows = [r for r in rows if (r[1][2] or 0) or (r[2][2] or 0)]
+    if not rows:
+        st.caption("Too few past cases to compare.")
+        return
+    rows.sort(key=lambda r: r[1][0] if r[1][0] is not None else -9)
+    names = [r[0] for r in rows]
+    fig = go.Figure()
+    for k, (name, col) in enumerate((("1 month", GOLD), ("1 year", BLUE)), start=1):
+        fig.add_bar(y=names, x=[r[k][0] for r in rows], orientation="h", name=name, marker_color=col,
+                    customdata=[[r[k][1], r[k][2]] for r in rows],
+                    hovertemplate="%{y}: %{x:+.0%}, " + did + " in %{customdata[0]} of %{customdata[1]}<extra>" + name + "</extra>")
+    fig.update_layout(barmode="group", height=60 + 38 * len(names), margin=dict(l=0, r=10, t=10, b=10),
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef",
+                      xaxis=dict(tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM),
+                      legend=dict(orientation="h", y=1.12, x=0))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def full(s: dict, X: dict, also: list | None = None):
     if st.button("← Back to today"):
         st.query_params.clear()
@@ -181,40 +201,22 @@ def full(s: dict, X: dict, also: list | None = None):
     cases = pd.DataFrame(X["cases"])
     sel: set = set()
     if X.get("rankings"):
-        st.markdown(f"**Past cases that were also {', '.join(k.split(' (')[0] for k in X['rankings'])}, like {X['subject']}**")
+        st.markdown(f"**Past cases that were also {', '.join(k.split(' (')[0] for k in X['rankings'])}, like "
+                    f"{html.escape(X['subject'])}** (middle case against the market)")
         rows = []
         for k, idx in X["rankings"].items():
             sub = cases.iloc[idx] if idx else cases.iloc[0:0]
             a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
-            rows.append({"ranking": k, "past cases": len(sub),
-                         "1 month later: beat the market": f"{a[1]} of {a[0]}" if a[0] else "–", "1 month, middle case": pct(a[3]),
-                         "1 year later: beat the market": f"{b[1]} of {b[0]}" if b[0] else "–", "1 year, middle case": pct(b[3])})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+            rows.append((k, (a[3], a[1], a[0]), (b[3], b[1], b[0])))
+        bars(rows, "beat the market")
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
-        st.markdown("**Which kind of stock did best after it, against the market** (top fifth of the S&P 500 on each ranking)")
-        L = X["lead"]
-        by = {r["pick"]: r for r in L.get("picks_252") or []}
-        st.dataframe(pd.DataFrame([{"ranking": r["pick"], "1 month later": pct(r.get("avg")),
-                                    "ahead after 1 month": f"{r.get('won')} of {r.get('n')}",
-                                    "1 year later": pct((by.get(r["pick"]) or {}).get("avg")),
-                                    "ahead after 1 year": (f"{by[r['pick']].get('won')} of {by[r['pick']].get('n')}"
-                                                           if r["pick"] in by else "–")} for r in L["picks_21"]]),
-                     hide_index=True, use_container_width=True)
-    if also:
-        st.markdown(f"### Similar cases to {html.escape(X['subject'])}: {html.escape(trig(X))}")
-        rows = []
-        for (s2, j2, X2) in also:
-            a, b = tally([c["after_21"] for c in X2["cases"]]), tally([c["after_252"] for c in X2["cases"]])
-            did = "beat the market" if X2["kind"] == "stock" else "market up"
-            rows.append({"version": f"{X2['subject']}: {X2['plain'] or X2['event']}", "past cases": len(X2["cases"]),
-                         f"1 month later": f"{a[1]} of {a[0]} {did}, middle case {pct(a[3])}" if a[0] else "–",
-                         f"1 year later": f"{b[1]} of {b[0]} {did}, middle case {pct(b[3])}" if b[0] else "–"})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-        pick = st.selectbox("Open a framing", ["–"] + [r["version"] for r in rows], key=f"ver_{s['id']}")
-        if pick != "–":
-            s2, j2, _ = also[[r["version"] for r in rows].index(pick)]
-            st.query_params.update({"story": s2["id"], "v": str(j2)})
-            st.rerun()
+        st.markdown("**Which kind of stock did best after it** (top fifth of the S&P 500 on each ranking, average "
+                    "against the market)")
+        Ld = X["lead"]
+        by = {r["pick"]: r for r in Ld.get("picks_252") or []}
+        bars([(r["pick"], (r.get("avg"), r.get("won"), r.get("n")),
+               ((by.get(r["pick"]) or {}).get("avg"), (by.get(r["pick"]) or {}).get("won"), (by.get(r["pick"]) or {}).get("n")))
+              for r in Ld["picks_21"]], "ahead of the market")
     if len(cases):
         st.markdown("**Every past case** (tick any to show only those in the chart)")
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
@@ -227,6 +229,9 @@ def full(s: dict, X: dict, also: list | None = None):
                           on_select="rerun", selection_mode="multi-row")
         rows = ev.selection.rows if ev and ev.selection else []
         sel = set(int(t.index[r]) for r in rows)
+    if also and st.button(f"Similar cases ({len(also)}) →"):
+        st.query_params.update({"view": "similar"})
+        st.rerun()
     with chart:
         overlay(X, sel)
     st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
