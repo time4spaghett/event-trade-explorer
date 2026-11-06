@@ -38,8 +38,8 @@ st.markdown("""<style>
 .chiron:hover span.run { animation-play-state:paused; }
 .chiron b { color:#d9a441; font-weight:600; margin-right:.4rem; } .chiron i { color:#9aa3b2; font-style:normal; margin:0 2.2rem 0 .3rem; }
 @keyframes roll { from { transform:translateX(0); } to { transform:translateX(-100%); } }
-.mast { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:400; font-size:2.8rem; letter-spacing:-.01em; line-height:1.1; margin:0 0 .2rem 0; }
-.tk { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:400; font-size:2.8rem; letter-spacing:-.01em; line-height:1.05; margin:0; }
+.mast { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.1; margin:0 0 .2rem 0; }
+.tk { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.05; margin:0; }
 .tk.small { font-size:2.1rem; }
 .why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
 .big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
