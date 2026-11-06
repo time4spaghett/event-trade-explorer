@@ -44,6 +44,7 @@ st.markdown("""<style>
 .why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
 .big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
 .box { background:#161b24; border:1px solid #2a3140; border-radius:8px; padding:.9rem 1.1rem; height:100%; }
+.take { font-size:1.05rem; margin:.8rem 0 .2rem 0; }
 .news { color:#9aa3b2; font-size:.95rem; margin:.6rem 0 .2rem 0; }
 </style>""", unsafe_allow_html=True)
 
@@ -92,7 +93,7 @@ def tally(vals):
 def measure(X: dict) -> str:
     """What a market exhibit's results are measured on, lower-cased for a sentence ("chip stocks", "the US stock average")."""
     m_ = X.get("measure") or "The US stock average"
-    return m_[:1].lower() + m_[1:] if not m_.split(" ", 1)[0].isupper() else m_
+    return "the" + m_[3:] if m_.startswith("The ") else m_ if m_.split(" ", 1)[0] in ("Brent", "Bitcoin", "Gold") else m_[:1].lower() + m_[1:]
 
 
 def trig(X: dict) -> str:
@@ -122,6 +123,40 @@ def headline(X: dict, small: bool = False):
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
                 f"<div class='meta' style='margin:-.5rem 0 .8rem 0'>{when}{yb}</div>", unsafe_allow_html=True)
+
+
+def takeaway(X: dict) -> str:
+    """One plain sentence from the counts (Alex 2026-11-06: readers asked for a takeaway). Rules, no model:
+    a hold "leans" one way when 60%+ of cases went that way and the median agrees; the stronger lean (share further
+    from half, then the bigger median) is the one called out."""
+    cs = X["cases"]
+    stock = X["kind"] == "stock"
+    up_word, down_word = (("beat the market", "lagged the market") if stock else (f"rose", f"fell"))
+    who = "Past cases like this" if stock else f"After past cases like this, {measure(X)}"
+    leans = []
+    for h, name in ((21, "a month"), (252, "a year")):
+        n, w, _, m = tally([c[f"after_{h}"] for c in cs])
+        if n < 5 or m is None:
+            continue
+        share = w / n
+        lean = "up" if share >= 0.6 and m > 0 else "down" if share <= 0.4 and m < 0 else None
+        leans.append((h, name, n, w, m, share, lean))
+    if not leans:
+        return "Too few past cases to say which way they went."
+    called = [x for x in leans if x[5] is not None and x[6]]
+    if not called:
+        return f"{who} went both ways: no clear lean after a month or a year."
+    best = max(called, key=lambda x: (abs(x[5] - 0.5), abs(x[4])))
+    word = up_word if best[6] == "up" else down_word
+    both = len(called) == 2 and called[0][6] == called[1][6]
+    when = (f"over both a month and a year, most clearly over {best[1]}" if both else f"over {best[1]}")
+    other = [x for x in leans if x is not best and not (both and x in called)]
+    tail = f"; over {other[0][1]} it was mixed" if other else ""
+    verb = word if stock else f"mostly {word}"
+    lead_ = f"{who} {'have mostly ' + word if stock else verb} {when}"
+    few = " Only a few past cases, so read it lightly." if min(x[2] for x in leans) < 10 else ""
+    return (f"{lead_}: {best[3]} of {best[2]} {'beat the market' if stock else 'were up'}, median {pct(best[4])}"
+            f"{tail}.{few}")
 
 
 def boxes(X: dict):
@@ -202,6 +237,7 @@ def full(s: dict, X: dict, also: list | None = None):
         st.rerun()
     headline(X)
     boxes(X)
+    st.markdown(f"<p class='take'>{html.escape(takeaway(X))}</p>", unsafe_allow_html=True)
     who = X["subject"] if X["kind"] == "stock" else "Now"
     st.markdown(f"**{who} against the {len(X['cases'])} past cases**")
     chart = st.container()   # drawn after the table, so the ticks in the table choose its lines
