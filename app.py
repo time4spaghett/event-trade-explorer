@@ -44,7 +44,8 @@ st.markdown("""<style>
 .why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
 .big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
 .box { background:#161b24; border:1px solid #2a3140; border-radius:8px; padding:.9rem 1.1rem; height:100%; }
-.take { font-size:1.05rem; margin:.8rem 0 .2rem 0; }
+.take { font-size:1.05rem; margin:.9rem 0 .6rem 0; padding:.6rem .9rem; border-left:3px solid #d9a441; background:#161b24; border-radius:0 6px 6px 0; }
+.take b { color:#d9a441; font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; display:block; margin-bottom:.15rem; }
 .news { color:#9aa3b2; font-size:.95rem; margin:.6rem 0 .2rem 0; }
 </style>""", unsafe_allow_html=True)
 
@@ -159,6 +160,10 @@ def takeaway(X: dict) -> str:
             f"{tail}.{few}")
 
 
+def take_box(X: dict):
+    st.markdown(f"<div class='take'><b>Takeaway</b>{html.escape(takeaway(X))}</div>", unsafe_allow_html=True)
+
+
 def boxes(X: dict):
     cs = X["cases"]
     n1, w1, a1, m1 = tally([c["after_21"] for c in cs])
@@ -189,10 +194,18 @@ def overlay(X: dict, sel: set | None = None):
             continue
         fig.add_scatter(x=x, y=p, mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
                         line=dict(color=PICKED[len(fig.data) % len(PICKED)] if sel else "rgba(154,163,178,.18)", width=2 if sel else 1))
+    band = st.toggle("Show the range of 80% of past cases", value=True, key=f"band_{X['event']}_{X['subject']}",
+                     help="Shaded: on each day, the middle 80% of past cases (10th to 90th percentile).")
     if len(P):
         ok = np.isfinite(P).sum(0) >= 5
         with np.errstate(all="ignore"):
             med = np.where(ok, np.nanmedian(P, axis=0), np.nan)
+            lo = np.where(ok, np.nanpercentile(P, 10, axis=0), np.nan)
+            hi = np.where(ok, np.nanpercentile(P, 90, axis=0), np.nan)
+        if band:
+            fig.add_scatter(x=x, y=hi, mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False)
+            fig.add_scatter(x=x, y=lo, mode="lines", line=dict(width=0), fill="tonexty",
+                            fillcolor="rgba(91,141,239,.30)", name="80% of past cases", hoverinfo="skip")
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
     fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
@@ -237,7 +250,7 @@ def full(s: dict, X: dict, also: list | None = None):
         st.rerun()
     headline(X)
     boxes(X)
-    st.markdown(f"<p class='take'>{html.escape(takeaway(X))}</p>", unsafe_allow_html=True)
+    take_box(X)
     who = X["subject"] if X["kind"] == "stock" else "Now"
     st.markdown(f"**{who} against the {len(X['cases'])} past cases**")
     chart = st.container()   # drawn after the table, so the ticks in the table choose its lines
@@ -290,6 +303,7 @@ def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
     with st.container(border=True):
         headline(X, small=True)
         boxes(X)
+        take_box(X)
         extra = ""
         st.markdown(f"<p class='news'>{html.escape(s['headline'])}<span class='meta'>{extra}</span></p>", unsafe_allow_html=True)
         b1, b2, _ = st.columns([1, 1.3, 5])
