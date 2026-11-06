@@ -272,8 +272,12 @@ groups = [{"lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], 
           for g in today.get("front") or []]
 
 
-RECENT = st.toggle("Include past cases from the last year", value=False,
-                   help="Off: only past cases at least a year old, so their year after does not overlap today's.")
+RECENT = bool(st.session_state.get("recent", False))   # the switch itself sits at the bottom of the page
+
+
+def recent_switch():
+    st.toggle("Include cases from the last year", key="recent",
+              help="Off: only past cases at least a year old, so their year after does not overlap today's.")
 
 
 def trim(X: dict | None) -> dict | None:
@@ -311,6 +315,7 @@ if s_open and ex(s_open, open_v):
             card(s2, X2, 100 + k, j2, 0)
     else:
         full(s_open, ex(s_open, open_v), others)
+    recent_switch()
     st.stop()
 
 items = []
@@ -336,6 +341,7 @@ with tab_today:
         elif st.button(f"Load more ({len(rest)})"):
             st.session_state.more = True
             st.rerun()
+    recent_switch()
 
 with tab_search:
     q = st.text_input("Search past event studies", placeholder="oil crash, chip sell-off, stock up 10x then drops ...")
