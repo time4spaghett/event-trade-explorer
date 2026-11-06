@@ -326,7 +326,8 @@ for g in groups[:TOP]:
     tail = (f"{X['subject']}: {w} of {n} past cases {'beat the market' if X['kind'] == 'stock' else 'saw the market up'}"
             f" a month later") if n else ""
     items.append(f"<b>{html.escape(s['headline'])}</b><i>{html.escape(tail)}</i>")
-st.markdown(f"<div class='chiron'><span class='run'>{''.join(items)}</span></div>", unsafe_allow_html=True)
+# Alex 2026-11-06: chiron off for now; uncomment to bring it back
+# st.markdown(f"<div class='chiron'><span class='run'>{''.join(items)}</span></div>", unsafe_allow_html=True)
 
 tab_today, tab_search, tab_ask = st.tabs(["Today", "Search the archive", "Commission a study"])
 
