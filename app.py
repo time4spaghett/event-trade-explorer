@@ -28,6 +28,7 @@ TOP = 5
 NOT_ADVICE = ""  # Alex 2026-11-06: dropped
 GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
 PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98c379", "#ff9e64"]  # ticked cases
+RECENT_COLS = ["#56b6c2", "#c678dd", "#e06c75", "#98c379", "#61afef", "#e5a0d6", "#f0f0f0", "#7ee0c8"]  # last year (no yellow)
 
 st.set_page_config(page_title="Event-related Trade Explorer", layout="wide")
 st.markdown("""<style>
@@ -131,20 +132,24 @@ def lib_status(X: dict) -> tuple[bool, str]:
     return active, last
 
 
+def badge_html(active: bool) -> str:
+    return (f"<span class='onair {'on' if active else 'off'}'><span class='led'></span>"
+            f"{'ACTIVE' if active else 'INACTIVE'}</span>")
+
+
 def headline(X: dict, small: bool = False):
     if X.get("library"):
         active, last = lib_status(X)
         r_ = X.get("recent") or []
-        badge = (f"<span class='onair {'on' if active else 'off'}'><span class='led'></span>"
-                 f"{'ACTIVE' if active else 'INACTIVE'}</span>")
-        line = f"Last happened {day(last)}" + (
+        badge = badge_html(active)
+        line = f"Last triggered {day(last)}" + (
             f" · in the last week: {', '.join(r_[:10])}{' and others' if len(r_) > 10 else ''}" if active and r_ else "")
         st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape((X['plain'] or X['event']).rstrip('.'))}</div>"
                     f"<div style='margin:.55rem 0 .9rem 0'>{badge}<span class='meta' style='margin-left:.8rem'>{line}</span></div>",
                     unsafe_allow_html=True)
         return
     when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
-            else f"Last happened {day(X['event_date'])}" if X.get("library") else f"Happened {day(X['event_date'])}")
+            else f"Last triggered {day(X['event_date'])}" if X.get("library") else f"Triggered {day(X['event_date'])}")
     y = X.get("year_before")
     if X.get("library") and X["kind"] == "stock":
         r_ = X.get("recent") or []
@@ -159,7 +164,8 @@ def headline(X: dict, small: bool = False):
         yb = f" · in the 12 months before, {m_} {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
-                f"<div class='meta' style='margin:-.5rem 0 .8rem 0'>{when}{yb}</div>", unsafe_allow_html=True)
+                f"<div style='margin:-.2rem 0 .9rem 0'>{badge_html(not X.get('pending'))}"
+                f"<span class='meta' style='margin-left:.8rem'>{when}{yb}</span></div>", unsafe_allow_html=True)
 
 
 def takeaway(X: dict) -> str:
@@ -216,7 +222,7 @@ def boxes(X: dict):
                      f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
 
 
-def overlay(X: dict, sel: set | None = None, extra: tuple | None = None):
+def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: set | None = None):
     """sel: case numbers ticked in the table; when some are ticked only those past cases are drawn."""
     step, B = X["step"], X["before"]
     x = np.arange(-B, X["after"] + 1, step)
@@ -226,10 +232,11 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None):
     for i, p in enumerate(P):
         c = X["cases"][p0 + i]
         lab = f"{c['who']} {c['date']}".strip()
-        if sel and p0 + i not in sel:
+        if (sel or rsel) and p0 + i not in (sel or set()):
             continue
         fig.add_scatter(x=x, y=p, mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
-                        line=dict(color=PICKED[len(fig.data) % len(PICKED)] if sel else "rgba(154,163,178,.18)", width=2 if sel else 1))
+                        line=dict(color=PICKED[len(fig.data) % len(PICKED)] if (sel or rsel) else "rgba(154,163,178,.18)",
+                                  width=2 if (sel or rsel) else 1))
     band = st.toggle("Show the range of 80% of past cases", value=True, key=f"band_{X['event']}_{X['subject']}",
                      help="Shaded: on each day, the middle 80% of past cases (10th to 90th percentile).")
     if len(P):
@@ -243,6 +250,26 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None):
             fig.add_scatter(x=x, y=lo, mode="lines", line=dict(width=0), fill="tonexty",
                             fillcolor="rgba(91,141,239,.30)", name="80% of past cases", hoverinfo="skip")
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
+    rc = X.get("recent_cases") or []
+    if rc:
+        show = st.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")),
+                         key=f"rc_{X['event']}_{X['subject']}",
+                         help="Cases whose year after is not over yet: not in the counts, drawn in colour.")
+        k = 0
+        for i, c in enumerate(rc):
+            if c.get("path") is None or not ((show and not sel and not rsel) or (rsel and i in rsel)):
+                continue
+            yv = [np.nan if v is None else v for v in c["path"]]
+            fin = [j for j, v in enumerate(yv) if np.isfinite(v)]
+            lab = c["who"] or c["date"]
+            col = RECENT_COLS[k % len(RECENT_COLS)]
+            k += 1
+            fig.add_scatter(x=x, y=yv, mode="lines", line=dict(color=col, width=2), name=f"{lab} ({c['date']})",
+                            hoverinfo="text", text=f"{lab} {c['date']}", showlegend=False)
+            if fin:
+                fig.add_annotation(x=x[fin[-1]], y=yv[fin[-1]], text=f"<b>{html.escape(lab)}</b>", showarrow=False,
+                                   xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col,
+                                   borderpad=2, xshift=4)
     s = np.array([np.nan if v is None else v for v in X["path"]], float)
     if X.get("library") and not lib_status(X)[0]:
         s = s * np.nan
@@ -347,23 +374,30 @@ def full(s: dict, X: dict, also: list | None = None):
         bars([(r["pick"], (r.get("avg"), r.get("won"), r.get("n")),
                ((by.get(r["pick"]) or {}).get("avg"), (by.get(r["pick"]) or {}).get("won"), (by.get(r["pick"]) or {}).get("n")))
               for r in Ld["picks_21"]], "ahead of the market")
-    if len(cases):
+    rsel: set = set()
+    rc = X.get("recent_cases") or []
+    if len(cases) or rc:
         st.markdown("**Every past case** (tick any to show only those in the chart)")
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
-        t = cases[cols].sort_values("date", ascending=False)
+        R = pd.DataFrame(rc)[cols].assign(_src="r", _i=range(len(rc))) if rc else pd.DataFrame(columns=cols + ["_src", "_i"])
+        O = cases[cols].assign(_src="o", _i=range(len(cases))) if len(cases) else pd.DataFrame(columns=cols + ["_src", "_i"])
+        t = pd.concat([R.sort_values("date", ascending=False), O.sort_values("date", ascending=False)], ignore_index=True)
+        src = list(zip(t["_src"], t["_i"]))
         for c in ("year_before", "after_21", "after_252"):
             t[c] = t[c].map(pct)
-        t = t.rename(columns={"who": "ticker", "year_before": "year before", "after_21": "1 month later",
-                              "after_252": "1 year later"})
+        t.insert(0, "active", ["\U0001F7E2" if a == "r" else "" for a, _ in src])
+        t = t.drop(columns=["_src", "_i"]).rename(columns={"who": "ticker", "year_before": "year before",
+                                                            "after_21": "1 month later", "after_252": "1 year later"})
         ev = st.dataframe(t, hide_index=True, use_container_width=True, key=f"pick_{s['id']}",
                           on_select="rerun", selection_mode="multi-row")
         rows = ev.selection.rows if ev and ev.selection else []
-        sel = set(int(t.index[r]) for r in rows)
+        sel = {int(src[r][1]) for r in rows if src[r][0] == "o"}
+        rsel = {int(src[r][1]) for r in rows if src[r][0] == "r"}
     if also and st.button(f"Similar cases ({len(also)}) →"):
         st.query_params.update({"view": "similar"})
         st.rerun()
     with chart:
-        overlay(X, sel, extra)
+        overlay(X, sel, extra, rsel)
     if s.get("headline"):
         st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
                     unsafe_allow_html=True)
@@ -501,7 +535,9 @@ def trim(X: dict | None) -> dict | None:
     new = {old: k for k, old in enumerate(keep)}
     p0 = X.get("paths_from", 0)
     pk = [(new[p0 + i], p) for i, p in enumerate(X["paths"]) if p0 + i in new]
-    return {**X, "cases": [X["cases"][i] for i in keep], "paths": [p for _, p in pk],
+    pth = {p0 + i: p for i, p in enumerate(X["paths"])}
+    rec = [{**X["cases"][i], "path": pth.get(i)} for i in range(len(X["cases"])) if i not in new]
+    return {**X, "cases": [X["cases"][i] for i in keep], "paths": [p for _, p in pk], "recent_cases": rec,
             "paths_from": pk[0][0] if pk else 0,
             "rankings": {k: [new[i] for i in v if i in new] for k, v in (X.get("rankings") or {}).items()}}
 
