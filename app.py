@@ -25,6 +25,58 @@ import streamlit as st
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
 TOP = 5
+THEMES = {   # Alex 2026-11-09: the easter egg (click the first story's status light); one is picked at random
+    "vhs": """<style>
+.stApp { background:#0e1117 url("data:image/svg+xml;base64,PHN2ZyBvcGFjaXR5PSIwLjA5IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDY0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWVjOWZmIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPCEtLSBhIGZseWluZy13aW5nIHBsYW4gdmlldyBkcmF3biBmb3IgdGhlIHNpdGUgKEFsZXggMjAyNi0xMS0wOTogdG9wIHZpZXcgb2YgdGhlIFBvbGVjYXQgYXMgYSBmYWludCBibHVlcHJpbnQpOyBub3QgYQogICAgICAgdHJhY2VkIGRyYXdpbmcgLS0+CiAgPGcgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNSI+CiAgICA8cGF0aCBkPSJNMCA4MEgxMDAwTTAgMTYwSDEwMDBNMCAyNDBIMTAwME0wIDMyMEgxMDAwTTAgNDAwSDEwMDBNMCA0ODBIMTAwME0wIDU2MEgxMDAwIi8+CiAgICA8cGF0aCBkPSJNMTAwIDBWNjQwTTIwMCAwVjY0ME0zMDAgMFY2NDBNNDAwIDBWNjQwTTUwMCAwVjY0ME02MDAgMFY2NDBNNzAwIDBWNjQwTTgwMCAwVjY0ME05MDAgMFY2NDAiLz4KICA8L2c+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSIxNCA2IDMgNiIgZD0iTTUwMCA2MFY0NzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjIuNCIgZD0iTTUwMCAxMTAgTCA5MDUgMzM1IEwgODkwIDM2MiBMIDc2MCAzMTggTCA2OTAgMzcyIEwgNjAwIDMzMCBMIDUwMCAzOTIgTCA0MDAgMzMwIEwgMzEwIDM3MiBMIDI0MCAzMTggTCAxMTAgMzYyIEwgOTUgMzM1IFoiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTUwMCAxNDAgQyA1NDAgMTUwIDU2MCAxOTAgNTY2IDI1MCBMIDU2NiAzMzAgTTUwMCAxNDAgQyA0NjAgMTUwIDQ0MCAxOTAgNDM0IDI1MCBMIDQzNCAzMzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTQ2OCAxOTYgTCA0ODYgMTg2IEwgNDg2IDIzNiBMIDQ2OCAyNDQgWiBNNTMyIDE5NiBMIDUxNCAxODYgTCA1MTQgMjM2IEwgNTMyIDI0NCBaIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSI2IDUiIGQ9Ik01NjAgMjA1IEwgODYwIDM0NSBNNDQwIDIwNSBMIDE0MCAzNDUgTTYwMCAzMzAgTCA3NjAgMzE4IE00MDAgMzMwIEwgMjQwIDMxOCIvPgogIDxnIHN0cm9rZS13aWR0aD0iMSI+CiAgICA8cGF0aCBkPSJNOTUgNTIwSDkwNU05NSA1MDVWNTM1TTkwNSA1MDVWNTM1TTk1IDUyMGwxNC02djEyek05MDUgNTIwbC0xNC02djEyeiIvPgogICAgPHBhdGggZD0iTTk2MCAxMTBWMzkyTTk0NSAxMTBIOTc1TTk0NSAzOTJIOTc1Ii8+CiAgPC9nPgogIDxnIGZpbGw9IiM5ZWM5ZmYiIHN0cm9rZT0ibm9uZSIgZm9udC1zaXplPSIxNSIgbGV0dGVyLXNwYWNpbmc9IjMiPgogICAgPHRleHQgeD0iNTAwIiB5PSI1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNQQU48L3RleHQ+CiAgICA8dGV4dCB4PSI5NzUiIHk9IjI1NSIgdHJhbnNmb3JtPSJyb3RhdGUoOTAgOTc1IDI1NSkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkxFTkdUSDwvdGV4dD4KICAgIDx0ZXh0IHg9Ijk1IiB5PSI2MTAiIGZvbnQtc2l6ZT0iMTgiIGxldHRlci1zcGFjaW5nPSI1Ij5QTEFOIFZJRVcgwrcgVEFJTExFU1MgRkxZSU5HIFdJTkcgwrcgU0NBTEUgMToxMDA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4K") no-repeat fixed;
+  background-size:min(78vw, 980px) auto; background-position:78% 30%; }
+.logo { position:relative; font-size:3.3rem; letter-spacing:.2em; padding:0 .1em .05em 0; transform:skewX(-9deg);
+  background:linear-gradient(180deg,#ffffff 0%,#e3e9f2 36%,#8c96a5 49%,#2a2f37 51%,#6f7a89 64%,#dfe5ee 82%,#ffffff 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 10px rgba(255,120,60,.25)); }
+.logo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:46%;
+  background:repeating-linear-gradient(180deg, transparent 0 4px, #0e1117 4px 6.5px); }
+.logo-bar { height:3px; width:min(560px, 92%); border-radius:2px;
+  background:linear-gradient(90deg,#ffb347 0%,#ff5e3a 40%,#d6246e 75%,rgba(214,36,110,0) 100%); }
+</style>""",
+    "phosphor": """<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+.stApp { background:#050a05; }
+.stApp::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background:repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.22) 2px 3px); }
+.logo { font-family:'VT323', monospace; font-size:4.4rem; letter-spacing:.12em; color:#5dff8a;
+  text-shadow:0 0 6px rgba(93,255,138,.9), 0 0 18px rgba(93,255,138,.45); }
+.logo::after { content:"_"; animation:blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.logo-bar { background:#5dff8a; box-shadow:0 0 8px #5dff8a; width:min(420px, 80%); height:2px; }
+.logo-sub { font-family:'VT323', monospace; font-size:1.25rem; letter-spacing:.3em; color:#3fbf63; }
+.tk, .mast { font-family:'VT323', monospace !important; color:#7dffa0; letter-spacing:.04em; }
+</style>""",
+    "neon": """<style>
+.stApp { background:radial-gradient(ellipse at 70% 0%, #2a0d3d 0%, #0e1117 55%); }
+.logo { font-size:3.4rem; letter-spacing:.24em; color:transparent; -webkit-text-stroke:1.5px #ff4fd8;
+  text-shadow:0 0 8px rgba(255,79,216,.85), 0 0 22px rgba(255,79,216,.45), 0 0 40px rgba(80,220,255,.25); }
+.logo-bar { width:min(520px, 90%); height:2px; background:linear-gradient(90deg,#50dcff,#ff4fd8);
+  box-shadow:0 0 10px #50dcff; }
+.logo-sub { color:#50dcff; text-shadow:0 0 6px rgba(80,220,255,.7); }
+</style>""",
+    "blueprint": """<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+.stApp { background:#0b2545 url("data:image/svg+xml;base64,PHN2ZyBvcGFjaXR5PSIwLjE2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDY0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWVjOWZmIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPCEtLSBhIGZseWluZy13aW5nIHBsYW4gdmlldyBkcmF3biBmb3IgdGhlIHNpdGUgKEFsZXggMjAyNi0xMS0wOTogdG9wIHZpZXcgb2YgdGhlIFBvbGVjYXQgYXMgYSBmYWludCBibHVlcHJpbnQpOyBub3QgYQogICAgICAgdHJhY2VkIGRyYXdpbmcgLS0+CiAgPGcgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNSI+CiAgICA8cGF0aCBkPSJNMCA4MEgxMDAwTTAgMTYwSDEwMDBNMCAyNDBIMTAwME0wIDMyMEgxMDAwTTAgNDAwSDEwMDBNMCA0ODBIMTAwME0wIDU2MEgxMDAwIi8+CiAgICA8cGF0aCBkPSJNMTAwIDBWNjQwTTIwMCAwVjY0ME0zMDAgMFY2NDBNNDAwIDBWNjQwTTUwMCAwVjY0ME02MDAgMFY2NDBNNzAwIDBWNjQwTTgwMCAwVjY0ME05MDAgMFY2NDAiLz4KICA8L2c+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSIxNCA2IDMgNiIgZD0iTTUwMCA2MFY0NzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjIuNCIgZD0iTTUwMCAxMTAgTCA5MDUgMzM1IEwgODkwIDM2MiBMIDc2MCAzMTggTCA2OTAgMzcyIEwgNjAwIDMzMCBMIDUwMCAzOTIgTCA0MDAgMzMwIEwgMzEwIDM3MiBMIDI0MCAzMTggTCAxMTAgMzYyIEwgOTUgMzM1IFoiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTUwMCAxNDAgQyA1NDAgMTUwIDU2MCAxOTAgNTY2IDI1MCBMIDU2NiAzMzAgTTUwMCAxNDAgQyA0NjAgMTUwIDQ0MCAxOTAgNDM0IDI1MCBMIDQzNCAzMzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTQ2OCAxOTYgTCA0ODYgMTg2IEwgNDg2IDIzNiBMIDQ2OCAyNDQgWiBNNTMyIDE5NiBMIDUxNCAxODYgTCA1MTQgMjM2IEwgNTMyIDI0NCBaIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSI2IDUiIGQ9Ik01NjAgMjA1IEwgODYwIDM0NSBNNDQwIDIwNSBMIDE0MCAzNDUgTTYwMCAzMzAgTCA3NjAgMzE4IE00MDAgMzMwIEwgMjQwIDMxOCIvPgogIDxnIHN0cm9rZS13aWR0aD0iMSI+CiAgICA8cGF0aCBkPSJNOTUgNTIwSDkwNU05NSA1MDVWNTM1TTkwNSA1MDVWNTM1TTk1IDUyMGwxNC02djEyek05MDUgNTIwbC0xNC02djEyeiIvPgogICAgPHBhdGggZD0iTTk2MCAxMTBWMzkyTTk0NSAxMTBIOTc1TTk0NSAzOTJIOTc1Ii8+CiAgPC9nPgogIDxnIGZpbGw9IiM5ZWM5ZmYiIHN0cm9rZT0ibm9uZSIgZm9udC1zaXplPSIxNSIgbGV0dGVyLXNwYWNpbmc9IjMiPgogICAgPHRleHQgeD0iNTAwIiB5PSI1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNQQU48L3RleHQ+CiAgICA8dGV4dCB4PSI5NzUiIHk9IjI1NSIgdHJhbnNmb3JtPSJyb3RhdGUoOTAgOTc1IDI1NSkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkxFTkdUSDwvdGV4dD4KICAgIDx0ZXh0IHg9Ijk1IiB5PSI2MTAiIGZvbnQtc2l6ZT0iMTgiIGxldHRlci1zcGFjaW5nPSI1Ij5QTEFOIFZJRVcgwrcgVEFJTExFU1MgRkxZSU5HIFdJTkcgwrcgU0NBTEUgMToxMDA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4K") no-repeat fixed;
+  background-size:min(80vw, 1000px) auto; background-position:80% 28%; }
+.stApp::before { content:""; position:fixed; inset:0; pointer-events:none;
+  background-image:linear-gradient(rgba(158,201,255,.07) 1px, transparent 1px),
+                   linear-gradient(90deg, rgba(158,201,255,.07) 1px, transparent 1px); background-size:28px 28px; }
+.logo { color:#dbeaff; letter-spacing:.3em; border:1.5px solid #9ec9ff; padding:.35rem .6rem .35rem .8rem; }
+.logo-bar { display:none; }
+.logo-sub { font-family:'Share Tech Mono', monospace; font-size:.95rem; color:#9ec9ff; margin-top:.4rem; }
+</style>""",
+    "arcade": """<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+.logo { font-family:'Press Start 2P', monospace; font-size:2.6rem; letter-spacing:.08em; color:#ffd23f;
+  text-shadow:4px 4px 0 #e5534b, 8px 8px 0 #2b59c3; margin-bottom:.9rem; }
+.logo-bar { display:none; }
+.logo-sub { font-family:'Press Start 2P', monospace; font-size:.62rem; letter-spacing:.2em; color:#56b6c2; }
+</style>""",
+}   # Alex 2026-11-09: the easter egg (click the first story's status light)
 EDIT = "--edit" in __import__("sys").argv or os.environ.get("EVENT_SITE_EDIT") == "1"   # Alex's local rank editor (launch config event-site-edit); never on the live site
 NOT_ADVICE = ""  # Alex 2026-11-06: dropped
 GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
@@ -32,6 +84,15 @@ PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98
 RECENT_COLS = ["#56b6c2", "#c678dd", "#e06c75", "#98c379", "#61afef", "#e5a0d6", "#f0f0f0", "#7ee0c8"]  # last year (no yellow)
 
 st.set_page_config(page_title="Polecat Event Trajectory Explorer", layout="wide")
+FUN = st.query_params.get("fun") if st.query_params.get("fun") in THEMES else None
+
+
+def clear_qp():
+    """Clear the page's query params but keep the easter-egg look on."""
+    st.query_params.clear()
+    if FUN:
+        st.query_params["fun"] = FUN
+
 st.markdown("""<style>
 .stApp { background:#0e1117; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
 .chiron { overflow:hidden; white-space:nowrap; border-top:1px solid #2a3140; border-bottom:1px solid #2a3140;
@@ -142,6 +203,15 @@ def lib_status(X: dict) -> tuple[bool, str]:
     return active, last
 
 
+def egg_wrap(badge: str, egg: bool) -> str:
+    """The first story's status light doubles as a secret switch for the fun look (Alex 2026-11-09)."""
+    if not egg:
+        return badge
+    import random
+    nxt = "0" if FUN else random.choice(list(THEMES))   # off when on; a random look when off
+    return f"<a href='?fun={nxt}' target='_self' style='text-decoration:none'>{badge}</a>"
+
+
 def badge_html(active) -> str:
     """True: ACTIVE (green). False: INACTIVE (grey). "pending": in the news today, not in our prices yet (amber;
     Alex 2026-11-09). It turns green the next morning once the close is in, if the move met the rule."""
@@ -151,7 +221,7 @@ def badge_html(active) -> str:
             f"{'ACTIVE' if active else 'INACTIVE'}</span>")
 
 
-def headline(X: dict, small: bool = False):
+def headline(X: dict, small: bool = False, egg: bool = False):
     if X.get("library"):
         active, last = lib_status(X)
         r_ = X.get("recent") or []
@@ -178,7 +248,7 @@ def headline(X: dict, small: bool = False):
         yb = f" · in the 12 months before, {m_} {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
-                f"<div style='margin:-.2rem 0 .9rem 0'>{badge_html('pending' if X.get('pending') else True)}"
+                f"<div style='margin:-.2rem 0 .9rem 0'>{egg_wrap(badge_html('pending' if X.get('pending') else True), egg)}"
                 f"<span class='meta' style='margin-left:.8rem'>{when}{yb}</span></div>", unsafe_allow_html=True)
 
 
@@ -340,11 +410,11 @@ def back():
     if st.query_params.get("from") == "search":
         if st.button("← Back to search"):
             q_ = st.query_params.get("q", "")
-            st.query_params.clear()
+            clear_qp()
             st.query_params.update({"view": "search", "q": q_})
             st.rerun()
     elif st.button("← Back to today"):
-        st.query_params.clear()
+        clear_qp()
         st.rerun()
 
 
@@ -424,14 +494,14 @@ def full(s: dict, X: dict, also: list | None = None):
 
 def card(s: dict, X: dict, i: int, j: int = 0, n_also: int = 0):
     with st.container(border=True):
-        headline(X, small=True)
+        headline(X, small=True, egg=(i == 0 and not CUR_DAY))
         boxes(X)
         take_box(X)
         extra = ""
         st.markdown(f"<p class='news'>{html.escape(s['headline'])}<span class='meta'>{extra}</span></p>", unsafe_allow_html=True)
         b1, b2, _ = st.columns([1, 1.3, 5])
         if b1.button("More info →", key=f"open{i}"):
-            st.query_params.clear()
+            clear_qp()
             st.query_params.update({"story": s["id"], "v": str(j), **({"day": CUR_DAY} if CUR_DAY else {})})
             st.rerun()
         if n_also and b2.button(f"Similar cases ({n_also})", key=f"sim{i}"):
@@ -477,6 +547,8 @@ def haiku_search(q: str, texts: tuple, key: str) -> list:
 
 today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
 
+if FUN:
+    st.markdown(THEMES[FUN], unsafe_allow_html=True)
 st.markdown("<div class='logo'>POLECAT</div><div class='logo-bar'></div>"   # Alex 2026-11-09: 70s-80s tech logotype
             "<div class='logo-sub'>EVENT TRAJECTORY EXPLORER</div>", unsafe_allow_html=True)
 if not today:
@@ -602,7 +674,7 @@ def search_ui(prefill: str = "", key: str = "q_tab"):
                     st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
                                 f"{html.escape(r.line)}", unsafe_allow_html=True)
                     if st.button("Open →", key=f"lib{r.Index}"):
-                        st.query_params.clear()
+                        clear_qp()
                         st.query_params.update({"lib": r.id, "from": "search", "q": q})
                         st.rerun()
                 continue
@@ -617,7 +689,7 @@ def search_ui(prefill: str = "", key: str = "q_tab"):
                     if s_ is None or j_ is None or not ((s_.get("exhibits") or [None] * (j_ + 1))[j_]):
                         st.caption("This study's full page is not available.")
                     else:
-                        st.query_params.clear()
+                        clear_qp()
                         st.query_params.update({"story": r.story_id, "v": str(j_), "from": "search", "q": q,
                                                 **({"day": r.date} if r.date != today["date"] else {})})
                         st.rerun()
@@ -628,7 +700,7 @@ def search_ui(prefill: str = "", key: str = "q_tab"):
 
 if st.query_params.get("view") == "search":
     if st.button("← Back to today"):
-        st.query_params.clear()
+        clear_qp()
         st.rerun()
     search_ui(st.query_params.get("q", ""), key="q_view")
     st.stop()
@@ -645,7 +717,7 @@ if lib_id and (LIB / f"{lib_id}.json.gz").exists():
         for r in sib:
             if st.button(f"{r['plain']} ({r['past_cases']} past cases) →", key=f"sib{r['id']}"):
                 keep_ = {k: st.query_params.get(k) for k in ("from", "q") if st.query_params.get(k)}
-                st.query_params.clear()
+                clear_qp()
                 st.query_params.update({"lib": r["id"], **keep_})
                 st.rerun()
     recent_switch()
@@ -660,7 +732,7 @@ if s_open and ex(s_open, open_v):
                                    if (s2["id"], j2) != (open_id, open_v) and ex(s2, j2)]
     if st.query_params.get("view") == "similar":
         if st.button("← Back to today"):
-            st.query_params.clear()
+            clear_qp()
             st.rerun()
         X0 = ex(s_open, open_v)
         st.markdown(f"## Similar cases to {html.escape(X0['subject'])}: {html.escape(trig(X0))}")
