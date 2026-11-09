@@ -25,6 +25,7 @@ import streamlit as st
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
 TOP = 5
+EDIT = "--edit" in __import__("sys").argv or os.environ.get("EVENT_SITE_EDIT") == "1"   # Alex's local rank editor (launch config event-site-edit); never on the live site
 NOT_ADVICE = ""  # Alex 2026-11-06: dropped
 GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
 PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98c379", "#ff9e64"]  # ticked cases
@@ -521,7 +522,7 @@ CUR_DAY = None if ed is today else ed["date"]
 st.markdown(f"<span class='meta'>{ed['date']} · prices through {ed.get('data_through')}"
             + (" · an earlier edition" if CUR_DAY else "") + "</span>", unsafe_allow_html=True)
 stories = ed["stories"]
-groups = [{"lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], j) for i, j in g["also"]]}
+groups = [{"key": g.get("key"), "lead": (stories[g["lead"][0]], g["lead"][1]), "also": [(stories[i], j) for i, j in g["also"]]}
           for g in ed.get("front") or []]
 
 
@@ -676,7 +677,64 @@ for g in groups[:TOP]:
 
 tab_today, tab_search, tab_ask = st.tabs(["Today", "Search the archive", "Commission a study"])
 
+def edit_front(groups: list):
+    """Alex 2026-11-09: move cards up or down, note what is wrong, save; the original and final order are kept
+    (editor.py) so the ranking can learn from them. Local only."""
+    import subprocess
+    import sys
+    import editor as EDT
+    byk = {g["key"]: g for g in groups}
+    rec = EDT.load(ed["date"])
+    original = [k for k in (rec["original"] if rec else []) if k in byk] or list(byk)
+    original += [k for k in byk if k not in original]
+    if st.session_state.get("ord_day") != ed["date"]:
+        st.session_state.ord_day = ed["date"]
+        st.session_state.ord = [k for k in (rec["final"] if rec else original) if k in byk] +             [k for k in original if rec and k not in rec["final"]]
+        for k, v in ((rec or {}).get("notes") or {}).items():
+            st.session_state[f"note_{k}"] = v
+    order = st.session_state.ord
+    st.info("Edit mode (local only): move cards with ▲ ▼, write a note on any card, then save. Saving keeps the "
+            "original and your order so the ranking learns from it.")
+    for r, k in enumerate(order):
+        if r == TOP:
+            st.markdown("**Below the fold** (behind Load more)")
+        g = byk[k]
+        a, b = st.columns([0.07, 0.93])
+        a.markdown(f"**#{r + 1}**" + (f"<br><span class='meta'>was #{original.index(k) + 1}</span>"
+                                       if original.index(k) != r else ""), unsafe_allow_html=True)
+        if a.button("▲", key=f"up_{k}", disabled=r == 0):
+            order[r - 1], order[r] = order[r], order[r - 1]
+            st.rerun()
+        if a.button("▼", key=f"dn_{k}", disabled=r == len(order) - 1):
+            order[r + 1], order[r] = order[r], order[r + 1]
+            st.rerun()
+        with b:
+            card(g["lead"][0], ex(*g["lead"]), r, g["lead"][1], len(g["also"]))
+            st.text_input("Note", key=f"note_{k}", placeholder="What's wrong or right with this one?",
+                          label_visibility="collapsed")
+    c1, c2, _ = st.columns([1, 1.2, 4])
+    def _save():
+        cards = {k: EDT.card_info(byk[k]["lead"][0], ex(*byk[k]["lead"])) for k in order}
+        return EDT.save(ed["date"], original, list(order), {k: st.session_state.get(f"note_{k}", "") for k in order}, cards)
+    if c1.button("Save"):
+        r_ = _save()
+        st.success(f"Saved {ed['date']}: order {'changed' if r_['changed'] else 'unchanged'}, {len(r_['notes'])} notes.")
+    if c2.button("Save and publish"):
+        _save()
+        root = HERE.parents[1]
+        with st.spinner("Exporting and pushing..."):
+            py = root / ".venv" / "Scripts" / "python.exe"
+            out = [subprocess.run([str(py if py.exists() else sys.executable), str(HERE / f)], cwd=root, capture_output=True, text=True,
+                                  env={**os.environ, "PYTHONUTF8": "1"}) for f in ("export.py", "publish.py")]
+        ok = all(o.returncode == 0 for o in out)
+        (st.success if ok else st.error)("Published; the live site updates in a minute or two." if ok else
+                                         "Publish failed: " + (out[-1].stderr or out[0].stderr)[-300:])
+
+
 with tab_today:
+  if EDIT and not CUR_DAY:
+    edit_front(groups)
+  else:
     for i, g in enumerate(groups[:TOP]):
         card(g["lead"][0], ex(*g["lead"]), i, g["lead"][1], len(g["also"]))
     rest = groups[TOP:]
