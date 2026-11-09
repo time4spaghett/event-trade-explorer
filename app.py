@@ -53,6 +53,9 @@ st.markdown("""<style>
 .onair.on { color:#7dffb0; text-shadow:0 0 6px rgba(63,220,127,.9); }
 .onair.on .led { background:radial-gradient(circle at 35% 30%,#d8ffe8 0%,#3fdc7f 45%,#0d7a3c 100%);
   box-shadow:0 0 8px 2px rgba(63,220,127,.8), 0 0 18px 4px rgba(63,220,127,.35); animation:glow 1.8s ease-in-out infinite; }
+.onair.pend { color:#ffcf70; text-shadow:0 0 6px rgba(240,170,40,.8); }
+.onair.pend .led { background:radial-gradient(circle at 35% 30%,#fff1c9 0%,#f0aa28 45%,#8a5a07 100%);
+  box-shadow:0 0 8px 2px rgba(240,170,40,.7), 0 0 16px 4px rgba(240,170,40,.3); }
 .onair.off { color:#8b929e; }
 .onair.off .led { background:radial-gradient(circle at 35% 30%,#9aa1ab 0%,#5a606a 55%,#2e333a 100%); }
 @keyframes glow { 0%,100% { box-shadow:0 0 6px 1px rgba(63,220,127,.7), 0 0 14px 3px rgba(63,220,127,.25); }
@@ -132,7 +135,11 @@ def lib_status(X: dict) -> tuple[bool, str]:
     return active, last
 
 
-def badge_html(active: bool) -> str:
+def badge_html(active) -> str:
+    """True: ACTIVE (green). False: INACTIVE (grey). "pending": in the news today, not in our prices yet (amber;
+    Alex 2026-11-09). It turns green the next morning once the close is in, if the move met the rule."""
+    if active == "pending":
+        return "<span class='onair pend'><span class='led'></span>PENDING</span>"
     return (f"<span class='onair {'on' if active else 'off'}'><span class='led'></span>"
             f"{'ACTIVE' if active else 'INACTIVE'}</span>")
 
@@ -148,7 +155,7 @@ def headline(X: dict, small: bool = False):
                     f"<div style='margin:.55rem 0 .9rem 0'>{badge}<span class='meta' style='margin-left:.8rem'>{line}</span></div>",
                     unsafe_allow_html=True)
         return
-    when = (f"Today's move is not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
+    when = (f"In the news today; not in our prices yet (they run through {day(X['data_through'])})" if X.get("pending")
             else f"Last triggered {day(X['event_date'])}" if X.get("library") else f"Triggered {day(X['event_date'])}")
     y = X.get("year_before")
     if X.get("library") and X["kind"] == "stock":
@@ -164,7 +171,7 @@ def headline(X: dict, small: bool = False):
         yb = f" · in the 12 months before, {m_} {'rose' if y >= 0 else 'fell'} {abs(y) * 100:.0f}%"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
-                f"<div style='margin:-.2rem 0 .9rem 0'>{badge_html(not X.get('pending'))}"
+                f"<div style='margin:-.2rem 0 .9rem 0'>{badge_html('pending' if X.get('pending') else True)}"
                 f"<span class='meta' style='margin-left:.8rem'>{when}{yb}</span></div>", unsafe_allow_html=True)
 
 
