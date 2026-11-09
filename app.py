@@ -166,10 +166,26 @@ def tally(vals):
     return len(v), sum(x > 0 for x in v), (float(np.mean(v)) if v else None), (float(np.median(v)) if v else None)
 
 
+RELABEL = {"The US market": "US equities", "the US market": "US equities", "Chip stocks": "Semiconductors",
+           "Oil": "WTI crude", "Energy stocks": "Energy sector", "Bank stocks": "Financials",
+           "Long Treasury bonds": "Long-dated Treasuries", "Junk-bond spreads": "High-yield spreads",
+           "The dollar": "The dollar (broad index)"}   # Alex 2026-11-09: labels in editions built before the rename
+
+
+def relabel(X: dict | None) -> dict | None:
+    if X:
+        for k in ("subject", "measure", "against"):
+            if X.get(k) in RELABEL:
+                X[k] = RELABEL[X[k]]
+    return X
+
+
 def measure(X: dict) -> str:
     """What a market exhibit's results are measured on, lower-cased for a sentence ("chip stocks", "the US stock average")."""
     m_ = X.get("measure") or "The US stock average"
-    return "the" + m_[3:] if m_.startswith("The ") else m_ if m_.split(" ", 1)[0] in ("Brent", "Bitcoin", "Gold") else m_[:1].lower() + m_[1:]
+    w = m_.split(" ", 1)[0]
+    return ("the" + m_[3:] if m_.startswith("The ") else m_ if w in ("Brent", "Bitcoin", "Gold") or (len(w) > 1 and w.isupper())
+            else m_[:1].lower() + m_[1:])   # keep US, WTI
 
 
 def trig(X: dict) -> str:
@@ -559,7 +575,7 @@ def load_lib_index(stamp: float) -> list:
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_lib(pid: str, stamp: float) -> dict:
     with gzip.open(LIB / f"{pid}.json.gz", "rt", encoding="utf-8") as fh:
-        return json.load(fh)
+        return relabel(json.load(fh))
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -621,7 +637,7 @@ def trim(X: dict | None) -> dict | None:
 
 
 def ex(s, j):
-    return trim((s.get("exhibits") or [None])[j]) if j < len(s.get("exhibits") or []) else None
+    return relabel(trim((s.get("exhibits") or [None])[j])) if j < len(s.get("exhibits") or []) else None
 
 
 def search_ui(prefill: str = "", key: str = "q_tab"):
