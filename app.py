@@ -62,19 +62,9 @@ THEMES = {   # Alex 2026-11-09: the easter egg (click the first story's status l
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 .stApp { background:#0b2545 url("data:image/svg+xml;base64,PHN2ZyBvcGFjaXR5PSIwLjE2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDY0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWVjOWZmIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPCEtLSBhIGZseWluZy13aW5nIHBsYW4gdmlldyBkcmF3biBmb3IgdGhlIHNpdGUgKEFsZXggMjAyNi0xMS0wOTogdG9wIHZpZXcgb2YgdGhlIFBvbGVjYXQgYXMgYSBmYWludCBibHVlcHJpbnQpOyBub3QgYQogICAgICAgdHJhY2VkIGRyYXdpbmcgLS0+CiAgPGcgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNSI+CiAgICA8cGF0aCBkPSJNMCA4MEgxMDAwTTAgMTYwSDEwMDBNMCAyNDBIMTAwME0wIDMyMEgxMDAwTTAgNDAwSDEwMDBNMCA0ODBIMTAwME0wIDU2MEgxMDAwIi8+CiAgICA8cGF0aCBkPSJNMTAwIDBWNjQwTTIwMCAwVjY0ME0zMDAgMFY2NDBNNDAwIDBWNjQwTTUwMCAwVjY0ME02MDAgMFY2NDBNNzAwIDBWNjQwTTgwMCAwVjY0ME05MDAgMFY2NDAiLz4KICA8L2c+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSIxNCA2IDMgNiIgZD0iTTUwMCA2MFY0NzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjIuNCIgZD0iTTUwMCAxMTAgTCA5MDUgMzM1IEwgODkwIDM2MiBMIDc2MCAzMTggTCA2OTAgMzcyIEwgNjAwIDMzMCBMIDUwMCAzOTIgTCA0MDAgMzMwIEwgMzEwIDM3MiBMIDI0MCAzMTggTCAxMTAgMzYyIEwgOTUgMzM1IFoiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTUwMCAxNDAgQyA1NDAgMTUwIDU2MCAxOTAgNTY2IDI1MCBMIDU2NiAzMzAgTTUwMCAxNDAgQyA0NjAgMTUwIDQ0MCAxOTAgNDM0IDI1MCBMIDQzNCAzMzAiLz4KICA8cGF0aCBzdHJva2Utd2lkdGg9IjEuNCIgZD0iTTQ2OCAxOTYgTCA0ODYgMTg2IEwgNDg2IDIzNiBMIDQ2OCAyNDQgWiBNNTMyIDE5NiBMIDUxNCAxODYgTCA1MTQgMjM2IEwgNTMyIDI0NCBaIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSI2IDUiIGQ9Ik01NjAgMjA1IEwgODYwIDM0NSBNNDQwIDIwNSBMIDE0MCAzNDUgTTYwMCAzMzAgTCA3NjAgMzE4IE00MDAgMzMwIEwgMjQwIDMxOCIvPgogIDxnIHN0cm9rZS13aWR0aD0iMSI+CiAgICA8cGF0aCBkPSJNOTUgNTIwSDkwNU05NSA1MDVWNTM1TTkwNSA1MDVWNTM1TTk1IDUyMGwxNC02djEyek05MDUgNTIwbC0xNC02djEyeiIvPgogICAgPHBhdGggZD0iTTk2MCAxMTBWMzkyTTk0NSAxMTBIOTc1TTk0NSAzOTJIOTc1Ii8+CiAgPC9nPgogIDxnIGZpbGw9IiM5ZWM5ZmYiIHN0cm9rZT0ibm9uZSIgZm9udC1zaXplPSIxNSIgbGV0dGVyLXNwYWNpbmc9IjMiPgogICAgPHRleHQgeD0iNTAwIiB5PSI1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNQQU48L3RleHQ+CiAgICA8dGV4dCB4PSI5NzUiIHk9IjI1NSIgdHJhbnNmb3JtPSJyb3RhdGUoOTAgOTc1IDI1NSkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkxFTkdUSDwvdGV4dD4KICAgIDx0ZXh0IHg9Ijk1IiB5PSI2MTAiIGZvbnQtc2l6ZT0iMTgiIGxldHRlci1zcGFjaW5nPSI1Ij5QTEFOIFZJRVcgwrcgVEFJTExFU1MgRkxZSU5HIFdJTkcgwrcgU0NBTEUgMToxMDA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4K") no-repeat fixed;
   background-size:min(80vw, 1000px) auto; background-position:80% 28%; }
-.stApp::before { content:""; position:fixed; inset:0; pointer-events:none;
-  background-image:linear-gradient(rgba(158,201,255,.07) 1px, transparent 1px),
-                   linear-gradient(90deg, rgba(158,201,255,.07) 1px, transparent 1px); background-size:28px 28px; }
 .logo { color:#dbeaff; letter-spacing:.3em; border:1.5px solid #9ec9ff; padding:.35rem .6rem .35rem .8rem; }
 .logo-bar { display:none; }
 .logo-sub { font-family:'Share Tech Mono', monospace; font-size:.95rem; color:#9ec9ff; margin-top:.4rem; }
-</style>""",
-    "arcade": """<style>
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-.logo { font-family:'Press Start 2P', monospace; font-size:2.6rem; letter-spacing:.08em; color:#ffd23f;
-  text-shadow:4px 4px 0 #e5534b, 8px 8px 0 #2b59c3; margin-bottom:.9rem; }
-.logo-bar { display:none; }
-.logo-sub { font-family:'Press Start 2P', monospace; font-size:.62rem; letter-spacing:.2em; color:#56b6c2; }
 </style>""",
 }   # Alex 2026-11-09: the easter egg (click the first story's status light)
 EDIT = "--edit" in __import__("sys").argv or os.environ.get("EVENT_SITE_EDIT") == "1"   # Alex's local rank editor (launch config event-site-edit); never on the live site
