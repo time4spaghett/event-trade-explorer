@@ -219,7 +219,7 @@ def boxes(X: dict):
     n2, w2, a2, m2 = tally([c["after_252"] for c in cs])
     did = "beat the market" if X["kind"] == "stock" else f"{measure(X)} {'were' if measure(X).endswith('s') else 'was'} up"
     since = f"since {min(c['date'] for c in cs)[:4]}" if cs else "no past cases yet"
-    first = "Stocks that did this before" if X["kind"] == "stock" else "Times this happened before"
+    first = "Stocks that did this before" if X["kind"] == "stock" else "Previous events"
     c1, c2, c3 = st.columns(3)
     c1.markdown(f"<div class='box'><span class='meta'>{first}</span><br><span class='big'>{len(cs)}</span><br>"
                 f"<span class='meta'>{since}</span></div>", unsafe_allow_html=True)
