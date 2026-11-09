@@ -33,14 +33,25 @@ RECENT_COLS = ["#56b6c2", "#c678dd", "#e06c75", "#98c379", "#61afef", "#e5a0d6",
 
 st.set_page_config(page_title="Polecat Event Trajectory Explorer", layout="wide")
 st.markdown("""<style>
-.stApp { background:#0e1117 url("data:image/svg+xml;base64,PHN2ZyBvcGFjaXR5PSIwLjA4NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgMTAwMCA2NDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzllYzlmZiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDwhLS0gYSBmbHlpbmctd2luZyBwbGFuIHZpZXcgZHJhd24gZm9yIHRoZSBzaXRlIChBbGV4IDIwMjYtMTEtMDk6IHRvcCB2aWV3IG9mIHRoZSBQb2xlY2F0IGFzIGEgZmFpbnQgYmx1ZXByaW50KTsgbm90IGEKICAgICAgIHRyYWNlZCBkcmF3aW5nIC0tPgogIDxnIHN0cm9rZS13aWR0aD0iMC42IiBvcGFjaXR5PSIwLjUiPgogICAgPHBhdGggZD0iTTAgODBIMTAwME0wIDE2MEgxMDAwTTAgMjQwSDEwMDBNMCAzMjBIMTAwME0wIDQwMEgxMDAwTTAgNDgwSDEwMDBNMCA1NjBIMTAwMCIvPgogICAgPHBhdGggZD0iTTEwMCAwVjY0ME0yMDAgMFY2NDBNMzAwIDBWNjQwTTQwMCAwVjY0ME01MDAgMFY2NDBNNjAwIDBWNjQwTTcwMCAwVjY0ME04MDAgMFY2NDBNOTAwIDBWNjQwIi8+CiAgPC9nPgogIDxwYXRoIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWRhc2hhcnJheT0iMTQgNiAzIDYiIGQ9Ik01MDAgNjBWNDcwIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIyLjQiIGQ9Ik01MDAgMTEwIEwgOTA1IDMzNSBMIDg5MCAzNjIgTCA3NjAgMzE4IEwgNjkwIDM3MiBMIDYwMCAzMzAgTCA1MDAgMzkyIEwgNDAwIDMzMCBMIDMxMCAzNzIgTCAyNDAgMzE4IEwgMTEwIDM2MiBMIDk1IDMzNSBaIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxLjQiIGQ9Ik01MDAgMTQwIEMgNTQwIDE1MCA1NjAgMTkwIDU2NiAyNTAgTCA1NjYgMzMwIE01MDAgMTQwIEMgNDYwIDE1MCA0NDAgMTkwIDQzNCAyNTAgTCA0MzQgMzMwIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxLjQiIGQ9Ik00NjggMTk2IEwgNDg2IDE4NiBMIDQ4NiAyMzYgTCA0NjggMjQ0IFogTTUzMiAxOTYgTCA1MTQgMTg2IEwgNTE0IDIzNiBMIDUzMiAyNDQgWiIvPgogIDxwYXRoIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWRhc2hhcnJheT0iNiA1IiBkPSJNNTYwIDIwNSBMIDg2MCAzNDUgTTQ0MCAyMDUgTCAxNDAgMzQ1IE02MDAgMzMwIEwgNzYwIDMxOCBNNDAwIDMzMCBMIDI0MCAzMTgiLz4KICA8ZyBzdHJva2Utd2lkdGg9IjEiPgogICAgPHBhdGggZD0iTTk1IDUyMEg5MDVNOTUgNTA1VjUzNU05MDUgNTA1VjUzNU05NSA1MjBsMTQtNnYxMnpNOTA1IDUyMGwtMTQtNnYxMnoiLz4KICAgIDxwYXRoIGQ9Ik05NjAgMTEwVjM5Mk05NDUgMTEwSDk3NU05NDUgMzkySDk3NSIvPgogIDwvZz4KICA8ZyBmaWxsPSIjOWVjOWZmIiBzdHJva2U9Im5vbmUiIGZvbnQtc2l6ZT0iMTUiIGxldHRlci1zcGFjaW5nPSIzIj4KICAgIDx0ZXh0IHg9IjUwMCIgeT0iNTU1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5TUEFOPC90ZXh0PgogICAgPHRleHQgeD0iOTc1IiB5PSIyNTUiIHRyYW5zZm9ybT0icm90YXRlKDkwIDk3NSAyNTUpIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5MRU5HVEg8L3RleHQ+CiAgICA8dGV4dCB4PSI5NSIgeT0iNjEwIiBmb250LXNpemU9IjE4IiBsZXR0ZXItc3BhY2luZz0iNSI+UExBTiBWSUVXIMK3IFRBSUxMRVNTIEZMWUlORyBXSU5HIMK3IFNDQUxFIDE6MTAwPC90ZXh0PgogIDwvZz4KPC9zdmc+Cg==") no-repeat fixed;
-  background-size:min(78vw, 980px) auto; background-position:78% 30%; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
+.stApp { background:#0e1117; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
 .chiron { overflow:hidden; white-space:nowrap; border-top:1px solid #2a3140; border-bottom:1px solid #2a3140;
           background:#11161f; padding:.45rem 0; margin:.3rem 0 1.2rem 0; }
 .chiron span.run { display:inline-block; padding-left:100%; animation:roll 90s linear infinite; }
 .chiron:hover span.run { animation-play-state:paused; }
 .chiron b { color:#d9a441; font-weight:600; margin-right:.4rem; } .chiron i { color:#9aa3b2; font-style:normal; margin:0 2.2rem 0 .3rem; }
 @keyframes roll { from { transform:translateX(0); } to { transform:translateX(-100%); } }
+@import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
+.logo { position:relative; display:inline-block; font-family:'Michroma', 'Eurostile', sans-serif; font-size:3.3rem;
+  letter-spacing:.2em; line-height:1; padding:0 .1em .05em 0; transform:skewX(-9deg); margin:.2rem 0 .35rem 0;
+  background:linear-gradient(180deg,#ffffff 0%,#e3e9f2 36%,#8c96a5 49%,#2a2f37 51%,#6f7a89 64%,#dfe5ee 82%,#ffffff 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 10px rgba(255,120,60,.18)); }
+.logo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:46%;
+  background:repeating-linear-gradient(180deg, transparent 0 4px, #0e1117 4px 6.5px); }
+.logo-bar { height:3px; width:min(560px, 92%); margin:.15rem 0 .45rem 0; border-radius:2px;
+  background:linear-gradient(90deg,#ffb347 0%,#ff5e3a 40%,#d6246e 75%,rgba(214,36,110,0) 100%); }
+.logo-sub { font:700 .82rem/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing:.42em; color:#aeb6c2;
+  margin:0 0 .5rem .15rem; }
 .mast { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.1; margin:0 0 .2rem 0; }
 .tk { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.05; margin:0; }
 .tk.small { font-size:2.1rem; }
@@ -472,7 +483,8 @@ def haiku_search(q: str, texts: tuple, key: str) -> list:
 
 today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
 
-st.markdown("<div class='mast'>Polecat Event Trajectory Explorer</div>", unsafe_allow_html=True)
+st.markdown("<div class='logo'>POLECAT</div><div class='logo-bar'></div>"   # Alex 2026-11-09: 70s-80s tech logotype
+            "<div class='logo-sub'>EVENT TRAJECTORY EXPLORER</div>", unsafe_allow_html=True)
 if not today:
     st.info("The first daily edition is not out yet.")
     st.stop()
