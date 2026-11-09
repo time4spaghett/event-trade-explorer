@@ -41,17 +41,11 @@ st.markdown("""<style>
 .chiron b { color:#d9a441; font-weight:600; margin-right:.4rem; } .chiron i { color:#9aa3b2; font-style:normal; margin:0 2.2rem 0 .3rem; }
 @keyframes roll { from { transform:translateX(0); } to { transform:translateX(-100%); } }
 @import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
-.logo { position:relative; display:inline-block; font-family:'Michroma', 'Eurostile', sans-serif; font-size:3.3rem;
-  letter-spacing:.2em; line-height:1; padding:0 .1em .05em 0; transform:skewX(-9deg); margin:.2rem 0 .35rem 0;
-  background:linear-gradient(180deg,#ffffff 0%,#e3e9f2 36%,#8c96a5 49%,#2a2f37 51%,#6f7a89 64%,#dfe5ee 82%,#ffffff 100%);
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter:drop-shadow(0 0 10px rgba(255,120,60,.18)); }
-.logo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:46%;
-  background:repeating-linear-gradient(180deg, transparent 0 4px, #0e1117 4px 6.5px); }
-.logo-bar { height:3px; width:min(560px, 92%); margin:.15rem 0 .45rem 0; border-radius:2px;
-  background:linear-gradient(90deg,#ffb347 0%,#ff5e3a 40%,#d6246e 75%,rgba(214,36,110,0) 100%); }
-.logo-sub { font:700 .82rem/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing:.42em; color:#aeb6c2;
-  margin:0 0 .5rem .15rem; }
+.logo { display:inline-block; font-family:'Michroma', 'Eurostile', sans-serif; font-size:2.9rem; letter-spacing:.16em;
+  line-height:1; color:#eef1f5; margin:.2rem 0 .45rem 0; }
+.logo-bar { height:2px; width:2.6rem; margin:0 0 .5rem .1rem; background:#d9a441; }
+.logo-sub { font:700 .8rem/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing:.32em; color:#9aa3b2;
+  margin:0 0 .6rem .1rem; }
 .mast { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.1; margin:0 0 .2rem 0; }
 .tk { font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; font-weight:700; font-size:2.8rem; letter-spacing:-.01em; line-height:1.05; margin:0; }
 .tk.small { font-size:2.1rem; }
