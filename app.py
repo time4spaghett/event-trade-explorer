@@ -1,4 +1,4 @@
-"""Event-related Trade Explorer: the daily event-study page (Alex 2026-11-05). The front page is today's top 5 news
+"""Polecat Event Trajectory Explorer (renamed 2026-11-09; was Event-related Trade Explorer): the daily event-study page (Alex 2026-11-05). The front page is today's top 5 news
 stories as short exhibit cards (Alex 2026-11-06: the stock-led MU exhibit's format), the rest under "Load more";
 each card opens its full exhibit (?story=<id>, a link people can share). Also: search over the event-study archive,
 and a box to commission a new study by email. Reads only this folder's data/ (export.py writes it each morning).
@@ -31,9 +31,10 @@ GOLD, BLUE, DIM = "#d9a441", "#5b8def", "#9aa3b2"
 PICKED = ["#e5534b", "#3fb27f", "#c678dd", "#56b6c2", "#f0f0f0", "#e5a0d6", "#98c379", "#ff9e64"]  # ticked cases
 RECENT_COLS = ["#56b6c2", "#c678dd", "#e06c75", "#98c379", "#61afef", "#e5a0d6", "#f0f0f0", "#7ee0c8"]  # last year (no yellow)
 
-st.set_page_config(page_title="Event-related Trade Explorer", layout="wide")
+st.set_page_config(page_title="Polecat Event Trajectory Explorer", layout="wide")
 st.markdown("""<style>
-.stApp { background:#0e1117; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
+.stApp { background:#0e1117 url("data:image/svg+xml;base64,PHN2ZyBvcGFjaXR5PSIwLjA4NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgMTAwMCA2NDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzllYzlmZiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDwhLS0gYSBmbHlpbmctd2luZyBwbGFuIHZpZXcgZHJhd24gZm9yIHRoZSBzaXRlIChBbGV4IDIwMjYtMTEtMDk6IHRvcCB2aWV3IG9mIHRoZSBQb2xlY2F0IGFzIGEgZmFpbnQgYmx1ZXByaW50KTsgbm90IGEKICAgICAgIHRyYWNlZCBkcmF3aW5nIC0tPgogIDxnIHN0cm9rZS13aWR0aD0iMC42IiBvcGFjaXR5PSIwLjUiPgogICAgPHBhdGggZD0iTTAgODBIMTAwME0wIDE2MEgxMDAwTTAgMjQwSDEwMDBNMCAzMjBIMTAwME0wIDQwMEgxMDAwTTAgNDgwSDEwMDBNMCA1NjBIMTAwMCIvPgogICAgPHBhdGggZD0iTTEwMCAwVjY0ME0yMDAgMFY2NDBNMzAwIDBWNjQwTTQwMCAwVjY0ME01MDAgMFY2NDBNNjAwIDBWNjQwTTcwMCAwVjY0ME04MDAgMFY2NDBNOTAwIDBWNjQwIi8+CiAgPC9nPgogIDxwYXRoIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWRhc2hhcnJheT0iMTQgNiAzIDYiIGQ9Ik01MDAgNjBWNDcwIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIyLjQiIGQ9Ik01MDAgMTEwIEwgOTA1IDMzNSBMIDg5MCAzNjIgTCA3NjAgMzE4IEwgNjkwIDM3MiBMIDYwMCAzMzAgTCA1MDAgMzkyIEwgNDAwIDMzMCBMIDMxMCAzNzIgTCAyNDAgMzE4IEwgMTEwIDM2MiBMIDk1IDMzNSBaIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxLjQiIGQ9Ik01MDAgMTQwIEMgNTQwIDE1MCA1NjAgMTkwIDU2NiAyNTAgTCA1NjYgMzMwIE01MDAgMTQwIEMgNDYwIDE1MCA0NDAgMTkwIDQzNCAyNTAgTCA0MzQgMzMwIi8+CiAgPHBhdGggc3Ryb2tlLXdpZHRoPSIxLjQiIGQ9Ik00NjggMTk2IEwgNDg2IDE4NiBMIDQ4NiAyMzYgTCA0NjggMjQ0IFogTTUzMiAxOTYgTCA1MTQgMTg2IEwgNTE0IDIzNiBMIDUzMiAyNDQgWiIvPgogIDxwYXRoIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWRhc2hhcnJheT0iNiA1IiBkPSJNNTYwIDIwNSBMIDg2MCAzNDUgTTQ0MCAyMDUgTCAxNDAgMzQ1IE02MDAgMzMwIEwgNzYwIDMxOCBNNDAwIDMzMCBMIDI0MCAzMTgiLz4KICA8ZyBzdHJva2Utd2lkdGg9IjEiPgogICAgPHBhdGggZD0iTTk1IDUyMEg5MDVNOTUgNTA1VjUzNU05MDUgNTA1VjUzNU05NSA1MjBsMTQtNnYxMnpNOTA1IDUyMGwtMTQtNnYxMnoiLz4KICAgIDxwYXRoIGQ9Ik05NjAgMTEwVjM5Mk05NDUgMTEwSDk3NU05NDUgMzkySDk3NSIvPgogIDwvZz4KICA8ZyBmaWxsPSIjOWVjOWZmIiBzdHJva2U9Im5vbmUiIGZvbnQtc2l6ZT0iMTUiIGxldHRlci1zcGFjaW5nPSIzIj4KICAgIDx0ZXh0IHg9IjUwMCIgeT0iNTU1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5TUEFOPC90ZXh0PgogICAgPHRleHQgeD0iOTc1IiB5PSIyNTUiIHRyYW5zZm9ybT0icm90YXRlKDkwIDk3NSAyNTUpIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5MRU5HVEg8L3RleHQ+CiAgICA8dGV4dCB4PSI5NSIgeT0iNjEwIiBmb250LXNpemU9IjE4IiBsZXR0ZXItc3BhY2luZz0iNSI+UExBTiBWSUVXIMK3IFRBSUxMRVNTIEZMWUlORyBXSU5HIMK3IFNDQUxFIDE6MTAwPC90ZXh0PgogIDwvZz4KPC9zdmc+Cg==") no-repeat fixed;
+  background-size:min(78vw, 980px) auto; background-position:78% 30%; color:#e6e9ef; } .block-container { padding-top:3.6rem; max-width:1100px; }
 .chiron { overflow:hidden; white-space:nowrap; border-top:1px solid #2a3140; border-bottom:1px solid #2a3140;
           background:#11161f; padding:.45rem 0; margin:.3rem 0 1.2rem 0; }
 .chiron span.run { display:inline-block; padding-left:100%; animation:roll 90s linear infinite; }
@@ -471,7 +472,7 @@ def haiku_search(q: str, texts: tuple, key: str) -> list:
 
 today, archive = load(tuple(f.stat().st_mtime for f in sorted(DATA.glob("*")) if f.is_file()))
 
-st.markdown("<div class='mast'>Event-related Trade Explorer</div>", unsafe_allow_html=True)
+st.markdown("<div class='mast'>Polecat Event Trajectory Explorer</div>", unsafe_allow_html=True)
 if not today:
     st.info("The first daily edition is not out yet.")
     st.stop()
