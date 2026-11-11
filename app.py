@@ -393,15 +393,13 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
     if np.isfinite(s).any():
         fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                         name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
+    tags = []
     for k_, (lab, xo, yo) in enumerate(extra):   # drawn like the last-year cases: a coloured line with its own tag
         yv = [np.nan if v is None else v for v in yo]
         col = ([GOLD] + RECENT_COLS[::-1])[k_ % (1 + len(RECENT_COLS))]
         fig.add_scatter(x=xo, y=yv, mode="lines", line=dict(color=col, width=3), name=lab, hoverinfo="text",
                         text=f"{lab}, trailing year to {X['data_through']} (t=0 is today)", showlegend=False)
-        fin = [j for j, v in enumerate(yv) if np.isfinite(v)]
-        if fin:   # every typed stock ends at 0 today, so its tag sits at the start of its line
-            fig.add_annotation(x=xo[fin[0]], y=yv[fin[0]], text=f"<b>{html.escape(lab)}</b>", showarrow=False,
-                               xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col, borderpad=2)
+        tags.append((lab, xo, yv, col))
     for tk in bad:
         cw.error(f"{tk}: Name not currently included in dataset", icon="🚩")
     if len(extra) > 1 and X.get("custom"):
@@ -414,6 +412,13 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         if np.isfinite(lo_) and np.isfinite(hi_):
             pad = (hi_ - lo_) * 0.15
             yr = [lo_ - pad, hi_ + pad]
+    for lab, xo, yv, col in tags:   # every typed stock ends at 0 today, so its tag sits at the start of its line:
+        fin = [j for j, v in enumerate(yv) if np.isfinite(v)]   # the first point inside the chart's scale, so the
+        if fin:                                                  # tag is never cut off (Alex 2026-11-11: MU had none)
+            j = next((j for j in fin if yr is None or yr[0] <= yv[j] <= yr[1]), fin[0])
+            y_ = yv[j] if yr is None else min(max(yv[j], yr[0]), yr[1])
+            fig.add_annotation(x=xo[j], y=y_, text=f"<b>{html.escape(lab)}</b>", showarrow=False,
+                               xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col, borderpad=2)
     ylab = (f"return relative to {X['against'].replace('the S&P 500 average', 'S&P 500')}, from t=0" if X["kind"] == "stock"
             else f"{measure(X)}, return from t=0")
     fig.update_layout(height=440, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
