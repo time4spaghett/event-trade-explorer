@@ -104,7 +104,9 @@ st.markdown("""<style>
 .tk.small { font-size:2.1rem; }
 .why { font-size:1.2rem; margin:.3rem 0 .8rem 0; } .meta { color:#9aa3b2; font-size:.85rem; }
 .big { font-size:2rem; font-weight:600; } .up { color:#3fb27f; } .down { color:#e5534b; }
-.box { background:#161b24; border:1px solid #2a3140; border-radius:8px; padding:.9rem 1.1rem; height:100%; }
+.box, div[data-testid="stTextInput"] div[data-baseweb="input"] { background:#161b24; border:1px solid #2a3140; border-radius:8px; }
+.box { padding:.9rem 1.1rem; height:100%; }
+div[data-testid="stTextInput"] div[data-baseweb="base-input"], div[data-testid="stTextInput"] input { background:transparent; }
 .onair { display:inline-flex; align-items:center; gap:.5rem; padding:.28rem .85rem .28rem .6rem; border:1.5px solid #e6e9ef;
   border-radius:8px; font:700 .78rem/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing:.14em;
   background:linear-gradient(180deg,#2a303b 0%,#151a22 100%);
@@ -338,7 +340,11 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         fig.add_scatter(x=x, y=p, mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
                         line=dict(color=PICKED[len(fig.data) % len(PICKED)] if (sel or rsel) else "rgba(154,163,178,.18)",
                                   width=2 if (sel or rsel) else 1))
-    c1, c2, c3 = st.columns([3, 3, 2]) if box else (st.container(), st.container(), None)
+    if box:   # Alex 2026-11-11: toggles stacked on the left, ticker box beside them, right third left for warnings
+        c1, c3, cw = st.columns(3)
+        c2 = c1
+    else:
+        c1, c2, c3, cw = st.container(), st.container(), None, st
     extra, bad = [], []
     if box:   # readers' stocks, each one's last year up to today (0 = today); several, comma-separated
         ov = load_overlay()
@@ -349,8 +355,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
                 extra.append((tk, ov["offsets"], ov["series"][tk]))
             else:
                 bad.append(tk)
-    band = c1.toggle("10–90% band", value=True, key=f"band_{X['event']}_{X['subject']}",
-                     help="10th to 90th percentile of past cases, by day.")
+    band = c1.toggle("10–90% band", value=True, key=f"band_{X['event']}_{X['subject']}")
     if len(P):
         ok = np.isfinite(P).sum(0) >= 5
         with np.errstate(all="ignore"):
@@ -366,7 +371,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
     if rc:
         show = c2.toggle(f"Last-year cases ({len(rc)})", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
                          key=f"rc_{X['event']}_{X['subject']}",
-                         help="Incomplete 1-year window. Excluded from the counts; drawn in colour.")
+                         help="Excluded from the counts: 1-year window incomplete.")
         k = 0
         for i, c in enumerate(rc):
             if c.get("path") is None or not ((show and not sel and not rsel) or (rsel and i in rsel)):
@@ -398,9 +403,9 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
             fig.add_annotation(x=xo[fin[0]], y=yv[fin[0]], text=f"<b>{html.escape(lab)}</b>", showarrow=False,
                                xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col, borderpad=2)
     for tk in bad:
-        st.error(f"{tk}: Name not currently included in dataset", icon="🚩")
+        cw.error(f"{tk}: Name not currently included in dataset", icon="🚩")
     if len(extra) > 1 and X.get("custom"):
-        st.caption(f"Factor cuts use {extra[0][0]} (first ticker).")
+        c3.caption(f"Factor cuts use {extra[0][0]} (first ticker).")
     fig.add_vline(x=0, line_color=DIM, line_dash="dot")
     yr = None
     if len(P) and not sel:   # fit the scale to the 80% band (with room), so a few extreme cases do not squash it
@@ -416,10 +421,8 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
                       xaxis=dict(title="trading days from event day (t=0)", gridcolor="#2a3140"),
                       yaxis=dict(title=ylab, tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM, range=yr))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    more = f" Paths for the {len(P)} most recent cases only." if X.get("paths_from") else ""
-    st.caption(("Selected cases. " if sel or rsel else "Grey: past cases. ") + "Blue: median path." + more,
-               help="Select rows in the table to plot only those cases. t=0 is the event day."
-                    + (" Typed tickers: trailing year, ending today at t=0." if box else ""))
+    if X.get("paths_from"):
+        st.caption(f"Paths for the {len(P)} most recent cases only.")
 
 
 def bars(rows: list, did: str):
@@ -469,8 +472,7 @@ def full(s: dict, X: dict, also: list | None = None):
     sel: set = set()
     if X.get("rankings"):
         st.markdown(f"**Factor cuts: {html.escape(X['subject'])}**",
-                    help=f"Past cases in the same top-quintile rankings as {X['subject']} on the event day. "
-                         "Median return relative to S&P 500.")
+                    help="Top quintile within the S&P 500 on the event day. Median return relative to S&P 500.")
         rows = []
         for k, idx in X["rankings"].items():
             sub = cases.iloc[idx] if idx else cases.iloc[0:0]
@@ -497,10 +499,8 @@ def full(s: dict, X: dict, also: list | None = None):
             st.caption(f"{tk}: in no top quintile today; no factor cut.")
         else:
             st.markdown(f"**Factor cuts: {html.escape(tk)}**" if tk else "**Factor cuts**",
-                        help=(f"Past cases in the top-quintile rankings {tk} holds today. " if tk else
-                              "Past cases by the top-quintile rankings each stock held on its event day. "
-                              "Enter a ticker above the chart to show only its rankings. ")
-                             + "Median return relative to S&P 500; quintiles within the S&P 500 at the time.")
+                        help=(f"Rankings where {tk} is top quintile today. " if tk else "")
+                             + "Top quintile within the S&P 500 on the event day. Median return relative to S&P 500.")
             rows = []
             for j in use:
                 sub = cases[cases.pk.map(lambda v: j in (v or []))]
@@ -523,7 +523,7 @@ def full(s: dict, X: dict, also: list | None = None):
     rsel: set = set()
     rc = X.get("recent_cases") or []
     if len(cases) or rc:
-        st.markdown("**Past cases**", help="Select rows to plot only those cases.")
+        st.markdown("**Past cases**")
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
         R = pd.DataFrame(rc)[cols].assign(_src="r", _i=range(len(rc))) if rc else pd.DataFrame(columns=cols + ["_src", "_i"])
         O = cases[cols].assign(_src="o", _i=range(len(cases))) if len(cases) else pd.DataFrame(columns=cols + ["_src", "_i"])
