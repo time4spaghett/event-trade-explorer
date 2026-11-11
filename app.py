@@ -551,7 +551,7 @@ def full(s: dict, X: dict, also: list | None = None):
     src = " · ".join(f"<a href='{html.escape(x.get('url', ''))}' target='_blank'>{html.escape(x.get('title') or 'source')}</a>"
                      for x in s.get("sources", [])[:3])
     st.markdown(f"<span class='meta'>{src}<br>Rule: <code>{html.escape(X['event'])}</code>. Returns relative to "
-                f"{X['against']} (equal-weighted S&amp;P 500, ex-financials); entry at next close. "
+                f"{X['against'].replace('the S&P 500 average', 'S&amp;P 500')} (equal-weighted, ex-financials); entry at next close. "
                 f"Prices through {X['data_through']}. {NOT_ADVICE}</span>", unsafe_allow_html=True)
 
 
