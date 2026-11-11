@@ -300,7 +300,7 @@ def takeaway(X: dict) -> str:
     other = [x for x in leans if x is not best and not (both and x in called)]
     tail = f"; {other[0][1]} mixed" if other else ""
     few = " Small sample." if min(x[2] for x in leans) < 10 else ""
-    return (f"{word} {when}: {'hit rate ' if stock else 'up in '}{best[3]} of {best[2]}, median {pct(best[4])}"
+    return (f"{word} {when}: {best[3]} of {best[2]} {'outperformed' if stock else 'up'}, median {pct(best[4])}"
             f"{tail}.{few}")
 
 
@@ -365,7 +365,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         if band:
             fig.add_scatter(x=x, y=hi, mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False)
             fig.add_scatter(x=x, y=lo, mode="lines", line=dict(width=0), fill="tonexty",
-                            fillcolor="rgba(91,141,239,.30)", name="10–90% band", hoverinfo="skip")
+                            fillcolor="rgba(91,141,239,.30)", name="80% range of past cases", hoverinfo="skip")
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median path")
     rc = X.get("recent_cases") or []
     if rc:
@@ -398,7 +398,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         yv = [np.nan if v is None else v for v in yo]
         col = ([GOLD] + RECENT_COLS[::-1])[k_ % (1 + len(RECENT_COLS))]
         fig.add_scatter(x=xo, y=yv, mode="lines", line=dict(color=col, width=3), name=lab, hoverinfo="text",
-                        text=f"{lab}, trailing year to {X['data_through']} (t=0 is today)", showlegend=False)
+                        text=f"{lab}, prior 12 months to {X['data_through']} (t=0 is today)", showlegend=False)
         tags.append((lab, xo, yv, col))
     for tk in bad:
         cw.error(f"{tk}: Name not currently included in dataset", icon="🚩")
@@ -427,7 +427,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
                       yaxis=dict(title=ylab, tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM, range=yr))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     if X.get("paths_from"):
-        st.caption(f"Paths for the {len(P)} most recent cases only.")
+        st.caption(f"Paths for the {len(P)} most recent past cases only.")
 
 
 def bars(rows: list, did: str):
@@ -442,7 +442,7 @@ def bars(rows: list, did: str):
     for k, (name, col) in enumerate((("1 month", GOLD), ("1 year", BLUE)), start=1):
         fig.add_bar(y=names, x=[r[k][0] for r in rows], orientation="h", name=name, marker_color=col,
                     customdata=[[r[k][1], r[k][2]] for r in rows],
-                    hovertemplate="%{y}: %{x:+.0%}, " + did + " in %{customdata[0]} of %{customdata[1]}<extra>" + name + "</extra>")
+                    hovertemplate="%{y}: %{x:+.0%}, %{customdata[0]} of %{customdata[1]} " + did + "<extra>" + name + "</extra>")
     fig.update_layout(barmode="group", height=60 + 38 * len(names), margin=dict(l=0, r=10, t=10, b=10),
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef",
                       xaxis=dict(tickformat="+.0%", gridcolor="#2a3140", zerolinecolor=DIM),
@@ -496,7 +496,7 @@ def full(s: dict, X: dict, also: list | None = None):
         tk = next((t for t in typed if t in ov["series"]), "")
         use = list(range(len(names)))
         if tk and tk not in now:
-            st.warning(f"{tk}: no factor rankings (financials excluded). Showing all rankings.", icon="⚠️")
+            st.warning(f"{tk}: no factor data (financials excluded). Showing all factors.", icon="⚠️")
             tk = ""
         elif tk:
             use = now[tk]
@@ -504,7 +504,7 @@ def full(s: dict, X: dict, also: list | None = None):
             st.caption(f"{tk}: in no top quintile today; no factor cut.")
         else:
             st.markdown(f"**Factor cuts: {html.escape(tk)}**" if tk else "**Factor cuts**",
-                        help=(f"Rankings where {tk} is top quintile today. " if tk else "")
+                        help=(f"Factors where {tk} is top quintile today. " if tk else "")
                              + "Top quintile within the S&P 500 on the event day. Median return relative to S&P 500.")
             rows = []
             for j in use:
@@ -512,14 +512,14 @@ def full(s: dict, X: dict, also: list | None = None):
                 a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
                 rows.append((rk(names[j]), (a[3], a[1], a[0]), (b[3], b[1], b[0])))
             a, b = tally(cases.after_21.tolist()), tally(cases.after_252.tolist())
-            rows.append(("All cases", (a[3], a[1], a[0]), (b[3], b[1], b[0])))
+            rows.append(("All past cases", (a[3], a[1], a[0]), (b[3], b[1], b[0])))
             none = [r[0] for r in rows if not ((r[1][2] or 0) or (r[2][2] or 0))]
             bars(rows, "outperformed")
             if none:
                 st.caption(f"No past cases: {', '.join(none)}.")
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
         st.markdown("**Factor returns after the event**",
-                    help="Top quintile of the S&P 500 on each ranking. Mean return relative to S&P 500.")
+                    help="Top quintile of the S&P 500 on each factor. Mean return relative to S&P 500.")
         Ld = X["lead"]
         by = {r["pick"]: r for r in Ld.get("picks_252") or []}
         bars([(rk(r["pick"]), (r.get("avg"), r.get("won"), r.get("n")),
@@ -538,7 +538,7 @@ def full(s: dict, X: dict, also: list | None = None):
         for c in ("year_before", "after_21", "after_252"):
             t[c] = t[c].map(pct)
         t.insert(0, "active", ["\U0001F7E2" if a == "r" else "" for a, _ in src])
-        t = t.drop(columns=["_src", "_i"]).rename(columns={"who": "ticker", "year_before": "prior 12m",
+        t = t.drop(columns=["_src", "_i"]).rename(columns={"who": "ticker", "year_before": "prior 12 months",
                                                             "after_21": "1 month", "after_252": "1 year"})
         ev = st.dataframe(t, hide_index=True, use_container_width=True, key=f"pick_{s['id']}",
                           on_select="rerun", selection_mode="multi-row")
@@ -677,8 +677,8 @@ RECENT = bool(st.session_state.get("recent", False))   # the switch itself sits 
 
 
 def recent_switch():
-    st.toggle("Include last-year cases", key="recent",
-              help="Off: only cases with a complete 1-year window.")
+    st.toggle("Include cases from the last year in the counts", key="recent",
+              help="Off: only past cases with a complete 1-year window.")
 
 
 def trim(X: dict | None) -> dict | None:
@@ -735,8 +735,8 @@ def search_ui(prefill: str = "", key: str = "q_tab"):
             for h, name in (("21", "1 month"), ("252", "1 year")):
                 a = lead.get(f"after_{h}") or {}
                 if a.get("n"):
-                    parts.append(f"{name}: {'outperformed' if r.kind == 'stock' else 'up'} {a.get('won')} of {a['n']} "
-                                 f"(mean {pct(a.get('avg'))})")
+                    parts.append(f"{name}: {a.get('won')} of {a['n']} {'outperformed' if r.kind == 'stock' else 'up'}, "
+                                 f"mean {pct(a.get('avg'))}")
             if r.src == "library":
                 with st.expander(f"Library · {r.plain}"):
                     st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
@@ -816,7 +816,7 @@ for g in groups[:TOP]:
     s, j = g["lead"]
     X = ex(s, j)
     n, w, _, _ = tally([c["after_21"] for c in X["cases"]])
-    tail = (f"{X['subject']}: {w} of {n} past cases {'beat the market' if X['kind'] == 'stock' else 'saw the market up'}"
+    tail = (f"{X['subject']}: {w} of {n} past cases {'outperformed' if X['kind'] == 'stock' else 'up'}"
             f" a month later") if n else ""
     items.append(f"<b>{html.escape(s['headline'])}</b><i>{html.escape(tail)}</i>")
 # Alex 2026-11-06: chiron off for now; uncomment to bring it back
