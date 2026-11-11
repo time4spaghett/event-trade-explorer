@@ -14,6 +14,7 @@ import hmac
 import html
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -313,8 +314,9 @@ def boxes(X: dict):
                      f"{pct(m)}</span> (average {pct(a)})</span></div>", unsafe_allow_html=True)
 
 
-def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: set | None = None):
-    """sel: case numbers ticked in the table; when some are ticked only those past cases are drawn."""
+def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set | None = None):
+    """sel: case numbers ticked in the table; when some are ticked only those past cases are drawn.
+    box: widget key for the ticker box (stock filter pages); it sits on the toggles' row (Alex 2026-11-11)."""
     step, B = X["step"], X["before"]
     x = np.arange(-B, X["after"] + 1, step)
     p0 = X.get("paths_from", 0)
@@ -328,7 +330,18 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: s
         fig.add_scatter(x=x, y=p, mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
                         line=dict(color=PICKED[len(fig.data) % len(PICKED)] if (sel or rsel) else "rgba(154,163,178,.18)",
                                   width=2 if (sel or rsel) else 1))
-    band = st.toggle("Show the range of 80% of past cases", value=True, key=f"band_{X['event']}_{X['subject']}",
+    c1, c2, c3 = st.columns([3, 3, 2]) if box else (st.container(), st.container(), None)
+    extra, bad = [], []
+    if box:   # readers' stocks, each one's last year up to today (0 = today); several, comma-separated
+        ov = load_overlay()
+        typed = c3.text_input("Tickers (comma-separated)", key=box, placeholder="Tickers (comma-separated)",
+                              label_visibility="collapsed")
+        for tk in dict.fromkeys(t.strip().upper() for t in re.split(r"[,\s]+", typed) if t.strip()):
+            if ov and tk in ov["series"]:
+                extra.append((tk, ov["offsets"], ov["series"][tk]))
+            else:
+                bad.append(tk)
+    band = c1.toggle("Show the range of 80% of past cases", value=True, key=f"band_{X['event']}_{X['subject']}",
                      help="Shaded: on each day, the middle 80% of past cases (10th to 90th percentile).")
     if len(P):
         ok = np.isfinite(P).sum(0) >= 5
@@ -343,7 +356,7 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: s
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     rc = X.get("recent_cases") or []
     if rc:
-        show = st.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
+        show = c2.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
                          key=f"rc_{X['event']}_{X['subject']}",
                          help="Cases whose year after is not over yet: not in the counts, drawn in colour.")
         k = 0
@@ -367,10 +380,12 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: s
     if np.isfinite(s).any():
         fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                         name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
-    if extra:   # a reader's stock, its last year up to today (0 = today)
-        lab, xo, yo = extra
-        fig.add_scatter(x=xo, y=[np.nan if v is None else v for v in yo], mode="lines", line=dict(color=GOLD, width=4),
+    for k_, (lab, xo, yo) in enumerate(extra):
+        fig.add_scatter(x=xo, y=[np.nan if v is None else v for v in yo], mode="lines",
+                        line=dict(color=([GOLD] + list(RECENT_COLS))[k_ % (1 + len(RECENT_COLS))], width=4 if k_ == 0 else 3),
                         name=f"{lab} (to {X['data_through']}, 0 = today)")
+    for tk in bad:
+        st.error(f"{tk}: Name not currently included in dataset", icon="🚩")
     fig.add_vline(x=0, line_color=DIM, line_dash="dot")
     yr = None
     if len(P) and not sel:   # fit the scale to the 80% band (with room), so a few extreme cases do not squash it
@@ -433,18 +448,7 @@ def full(s: dict, X: dict, also: list | None = None):
     who = "Now" if X["kind"] != "stock" else ("The past cases" if X.get("library") else X["subject"])
     st.markdown(f"**The {len(X['cases'])} past cases**" if X.get("library") and not (X["kind"] != "stock" and lib_status(X)[0])
                 else f"**{who} against the {len(X['cases'])} past cases**")
-    extra = None
-    if X.get("library") and X["kind"] == "stock":
-        ov = load_overlay()
-        tk = st.text_input("Overlay a stock (S&P 500 ticker): its last year up to today", key=f"ov_{X.get('id')}").strip().upper()
-        if tk:
-            if ov and tk in ov["series"]:
-                extra = (tk, ov["offsets"], ov["series"][tk])
-                if tk not in (X.get("recent") or []):
-                    st.warning(f"{tk} has not passed this filter in the last week, so it is being compared with cases it "
-                               "does not match.", icon="⚠️")
-            else:
-                st.warning(f"{tk} is not in the current S&P 500 price file.", icon="⚠️")
+    box = f"ov_{X.get('id')}" if X.get("library") and X["kind"] == "stock" else None
     chart = st.container()   # drawn after the table, so the ticks in the table choose its lines
     cases = pd.DataFrame(X["cases"])
     sel: set = set()
@@ -519,7 +523,7 @@ def full(s: dict, X: dict, also: list | None = None):
         st.query_params.update({"view": "similar"})
         st.rerun()
     with chart:
-        overlay(X, sel, extra, rsel)
+        overlay(X, sel, box, rsel)
     if s.get("headline"):
         st.markdown(f"<p class='news'><b>The news:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
                     unsafe_allow_html=True)
