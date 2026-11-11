@@ -262,7 +262,7 @@ def headline(X: dict, small: bool = False, egg: bool = False):
         yb = f" · prior 12 months: {pct(y)} relative to S&amp;P 500"
     else:
         m_ = measure(X)
-        yb = f" · prior 12 months: {m_} {pct(y)}"
+        yb = f" · prior 12 months: {pct(y)}"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
                 f"<div style='margin:-.2rem 0 .9rem 0'>{egg_wrap(badge_html('pending' if X.get('pending') else True), egg)}"
