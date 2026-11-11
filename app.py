@@ -343,7 +343,7 @@ def overlay(X: dict, sel: set | None = None, extra: tuple | None = None, rsel: s
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median past case")
     rc = X.get("recent_cases") or []
     if rc:
-        show = st.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")),
+        show = st.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
                          key=f"rc_{X['event']}_{X['subject']}",
                          help="Cases whose year after is not over yet: not in the counts, drawn in colour.")
         k = 0
