@@ -483,7 +483,10 @@ def full(s: dict, X: dict, also: list | None = None):
                 rows.append((names[j], (a[3], a[1], a[0]), (b[3], b[1], b[0])))
             a, b = tally(cases.after_21.tolist()), tally(cases.after_252.tolist())
             rows.append(("all past cases", (a[3], a[1], a[0]), (b[3], b[1], b[0])))
+            none = [r[0].split(" (")[0] for r in rows if not ((r[1][2] or 0) or (r[2][2] or 0))]
             bars(rows, "beat the market")
+            if none:
+                st.caption(f"No past case was {', '.join(none)}, so there is no bar for it.")
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
         st.markdown("**Which kind of stock did best after it** (top fifth of the S&P 500 on each ranking, average "
                     "against the market)")
