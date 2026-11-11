@@ -380,12 +380,19 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
     if np.isfinite(s).any():
         fig.add_scatter(x=x, y=s, mode="lines", line=dict(color=GOLD, width=4),
                         name=f"{X['subject'] if X['kind'] == 'stock' else 'now'} (to {X['data_through']})")
-    for k_, (lab, xo, yo) in enumerate(extra):
-        fig.add_scatter(x=xo, y=[np.nan if v is None else v for v in yo], mode="lines",
-                        line=dict(color=([GOLD] + list(RECENT_COLS))[k_ % (1 + len(RECENT_COLS))], width=4 if k_ == 0 else 3),
-                        name=f"{lab} (to {X['data_through']}, 0 = today)")
+    for k_, (lab, xo, yo) in enumerate(extra):   # drawn like the last-year cases: a coloured line with its own tag
+        yv = [np.nan if v is None else v for v in yo]
+        col = ([GOLD] + RECENT_COLS[::-1])[k_ % (1 + len(RECENT_COLS))]
+        fig.add_scatter(x=xo, y=yv, mode="lines", line=dict(color=col, width=3), name=lab, hoverinfo="text",
+                        text=f"{lab}, its last year to {X['data_through']} (0 = today)", showlegend=False)
+        fin = [j for j, v in enumerate(yv) if np.isfinite(v)]
+        if fin:   # every typed stock ends at 0 today, so its tag sits at the start of its line
+            fig.add_annotation(x=xo[fin[0]], y=yv[fin[0]], text=f"<b>{html.escape(lab)}</b>", showarrow=False,
+                               xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col, borderpad=2)
     for tk in bad:
         st.error(f"{tk}: Name not currently included in dataset", icon="🚩")
+    if len(extra) > 1 and X.get("custom"):
+        st.caption(f"{extra[0][0]}, the first ticker, drives the factor cuts below the chart.")
     fig.add_vline(x=0, line_color=DIM, line_dash="dot")
     yr = None
     if len(P) and not sel:   # fit the scale to the 80% band (with room), so a few extreme cases do not squash it
@@ -404,7 +411,8 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
     st.caption(("Showing the past cases ticked in the table below. " if sel else
                 "Each grey line is one past case; tick cases in the table below to show only those. ")
                + "The blue line is the median past case on each day. Left of 0 is the lead-up; right of 0 is "
-               "what came after." + more)
+               "what came after." + more
+               + (" Each typed ticker's line is its last year up to today (0 = today)." if extra else ""))
 
 
 def bars(rows: list, did: str):
@@ -466,11 +474,14 @@ def full(s: dict, X: dict, also: list | None = None):
         # sits in today, and how the past cases that sat in the same ranking did. No stock typed: all the rankings.
         names = list(ed.get("picks") or {})
         now = ed.get("picks_now") or {}
-        tk = st.text_input("Stand-in stock (S&P 500 ticker): if it had this event today, which of its traits mattered "
-                           "in past cases?", key=f"cond_{s['id']}").strip().upper()
+        # the stock is the first one typed in the Tickers box above the chart that is in the price file (the box
+        # is drawn later in this run, so its text is read from the session state)
+        ov = load_overlay() or {"series": {}}
+        typed = [t.strip().upper() for t in re.split(r"[,\s]+", st.session_state.get(box) or "") if t.strip()]
+        tk = next((t for t in typed if t in ov["series"]), "")
         use = list(range(len(names)))
         if tk and tk not in now:
-            st.warning(f"{tk} is not in the current S&P 500 list (financials are left out). Showing every ranking.", icon="⚠️")
+            st.warning(f"{tk} has no factor rankings (financials are left out). Showing every ranking.", icon="⚠️")
             tk = ""
         elif tk:
             use = now[tk]
@@ -478,7 +489,7 @@ def full(s: dict, X: dict, also: list | None = None):
             st.caption(f"{tk} is not in the top fifth of any of the {len(names)} rankings today, so there is no cut to show.")
         else:
             st.markdown((f"**Past cases that were also {', '.join(names[j].split(' (')[0] for j in use)}, like {html.escape(tk)} "
-                         f"today**" if tk else "**Past cases by the kind of stock it was**")
+                         f"today**" if tk else "**Past cases by the kind of stock it was** (type a ticker above the chart to cut by its traits)")
                         + " (median against the market; top fifth of the S&P 500 on each ranking at the time)")
             rows = []
             for j in use:
