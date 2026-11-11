@@ -457,6 +457,33 @@ def full(s: dict, X: dict, also: list | None = None):
             a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
             rows.append((k, (a[3], a[1], a[0]), (b[3], b[1], b[0])))
         bars(rows, "beat the market")
+    elif X.get("custom") and len(cases) and "pk" in cases.columns:
+        # Alex 2026-11-11: a custom study has no stock of its own, so a stand-in stock picks the cut: the rankings it
+        # sits in today, and how the past cases that sat in the same ranking did. No stock typed: all the rankings.
+        names = list(ed.get("picks") or {})
+        now = ed.get("picks_now") or {}
+        tk = st.text_input("Stand-in stock (S&P 500 ticker): if it had this event today, which of its traits mattered "
+                           "in past cases?", key=f"cond_{s['id']}").strip().upper()
+        use = list(range(len(names)))
+        if tk and tk not in now:
+            st.warning(f"{tk} is not in the current S&P 500 list (financials are left out). Showing every ranking.", icon="⚠️")
+            tk = ""
+        elif tk:
+            use = now[tk]
+        if tk and not use:
+            st.caption(f"{tk} is not in the top fifth of any of the {len(names)} rankings today, so there is no cut to show.")
+        else:
+            st.markdown((f"**Past cases that were also {', '.join(names[j].split(' (')[0] for j in use)}, like {html.escape(tk)} "
+                         f"today**" if tk else "**Past cases by the kind of stock it was**")
+                        + " (median against the market; top fifth of the S&P 500 on each ranking at the time)")
+            rows = []
+            for j in use:
+                sub = cases[cases.pk.map(lambda v: j in (v or []))]
+                a, b = tally(sub.after_21.tolist()), tally(sub.after_252.tolist())
+                rows.append((names[j], (a[3], a[1], a[0]), (b[3], b[1], b[0])))
+            a, b = tally(cases.after_21.tolist()), tally(cases.after_252.tolist())
+            rows.append(("all past cases", (a[3], a[1], a[0]), (b[3], b[1], b[0])))
+            bars(rows, "beat the market")
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
         st.markdown("**Which kind of stock did best after it** (top fifth of the S&P 500 on each ranking, average "
                     "against the market)")
