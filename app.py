@@ -355,7 +355,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
                 extra.append((tk, ov["offsets"], ov["series"][tk]))
             else:
                 bad.append(tk)
-    band = c1.toggle("10–90% band", value=True, key=f"band_{X['event']}_{X['subject']}")
+    band = c1.toggle("Show the range of 80% of past cases", value=True, key=f"band_{X['event']}_{X['subject']}")
     if len(P):
         ok = np.isfinite(P).sum(0) >= 5
         with np.errstate(all="ignore"):
@@ -369,7 +369,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         fig.add_scatter(x=x, y=med, mode="lines", line=dict(color=BLUE, width=3), name="median path")
     rc = X.get("recent_cases") or []
     if rc:
-        show = c2.toggle(f"Last-year cases ({len(rc)})", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
+        show = c2.toggle(f"Show the {len(rc)} case{'' if len(rc) == 1 else 's'} from the last year", value=bool(X.get("library")) and not X.get("custom"),   # custom studies: off by default (Alex 2026-11-11)
                          key=f"rc_{X['event']}_{X['subject']}",
                          help="Excluded from the counts: 1-year window incomplete.")
         k = 0
