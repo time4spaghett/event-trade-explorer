@@ -472,7 +472,8 @@ def full(s: dict, X: dict, also: list | None = None):
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
         R = pd.DataFrame(rc)[cols].assign(_src="r", _i=range(len(rc))) if rc else pd.DataFrame(columns=cols + ["_src", "_i"])
         O = cases[cols].assign(_src="o", _i=range(len(cases))) if len(cases) else pd.DataFrame(columns=cols + ["_src", "_i"])
-        t = pd.concat([R.sort_values("date", ascending=False), O.sort_values("date", ascending=False)], ignore_index=True)
+        # Alex 2026-11-11: active cases (last year, still running) go at the bottom of the table, not the top
+        t = pd.concat([O.sort_values("date", ascending=False), R.sort_values("date", ascending=False)], ignore_index=True)
         src = list(zip(t["_src"], t["_i"]))
         for c in ("year_before", "after_21", "after_252"):
             t[c] = t[c].map(pct)
