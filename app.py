@@ -264,7 +264,7 @@ def headline(X: dict, small: bool = False, egg: bool = False):
         yb = f" · prior 12 months: {pct(y)} relative to S&amp;P 500"
     else:
         m_ = measure(X)
-        yb = f" · prior 12 months: {pct(y)}"
+        yb = f" · prior 12 months: {pct(y)} absolute"
     st.markdown(f"<div class='tk{' small' if small else ''}'>{html.escape(X['subject'])}</div>"
                 f"<div class='why'>{html.escape(X['plain'] or X['event'])}</div>"
                 f"<div style='margin:-.2rem 0 .9rem 0'>{egg_wrap(badge_html('pending' if X.get('pending') else True), egg)}"
@@ -279,7 +279,7 @@ def takeaway(X: dict) -> str:
     stock = X["kind"] == "stock"
     M_ = measure(X)
     M_ = M_[:1].upper() + M_[1:]
-    up_word, down_word = ("Outperformed", "Underperformed") if stock else (f"{M_} higher", f"{M_} lower")
+    up_word, down_word = ("Outperformed S&P 500", "Underperformed S&P 500") if stock else (f"{M_} higher", f"{M_} lower")
     leans = []
     for h, name in ((21, "1 month"), (252, "1 year")):
         n, w, _, m = tally([c[f"after_{h}"] for c in cs])
@@ -300,7 +300,7 @@ def takeaway(X: dict) -> str:
     other = [x for x in leans if x is not best and not (both and x in called)]
     tail = f"; {other[0][1]} mixed" if other else ""
     few = " Small sample." if min(x[2] for x in leans) < 10 else ""
-    return (f"{word} {when}: {best[3]} of {best[2]} {'outperformed' if stock else 'up'}, median {pct(best[4])}"
+    return (f"{word} {when}: {best[3]} of {best[2]} {'outperformed' if stock else 'up'}, median {pct(best[4])}{'' if stock else ' absolute'}"
             f"{tail}.{few}")
 
 
@@ -312,7 +312,7 @@ def boxes(X: dict):
     cs = X["cases"]
     n1, w1, a1, m1 = tally([c["after_21"] for c in cs])
     n2, w2, a2, m2 = tally([c["after_252"] for c in cs])
-    did = "outperformed" if X["kind"] == "stock" else f"{measure(X)} up"
+    did = "outperformed S&P 500" if X["kind"] == "stock" else f"{measure(X)} up, absolute"
     since = f"since {min(c['date'] for c in cs)[:4]}" if cs else "none yet"
     first = "Past cases"
     c1, c2, c3 = st.columns(3)
@@ -398,7 +398,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         yv = [np.nan if v is None else v for v in yo]
         col = ([GOLD] + RECENT_COLS[::-1])[k_ % (1 + len(RECENT_COLS))]
         fig.add_scatter(x=xo, y=yv, mode="lines", line=dict(color=col, width=3), name=lab, hoverinfo="text",
-                        text=f"{lab}, prior 12 months to {X['data_through']} (t=0 is today)", showlegend=False)
+                        text=f"{lab} relative to S&P 500, prior 12 months to {X['data_through']} (t=0 is today)", showlegend=False)
         tags.append((lab, xo, yv, col))
     for tk in bad:
         cw.error(f"{tk}: Name not currently included in dataset", icon="🚩")
@@ -420,7 +420,7 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
             fig.add_annotation(x=xo[j], y=y_, text=f"<b>{html.escape(lab)}</b>", showarrow=False,
                                xanchor="left", font=dict(color="#0e1117", size=11), bgcolor=col, borderpad=2)
     ylab = (f"return relative to {X['against'].replace('the S&P 500 average', 'S&P 500')}, from t=0" if X["kind"] == "stock"
-            else f"{measure(X)}, return from t=0")
+            else f"{measure(X)}, absolute return from t=0")
     fig.update_layout(height=440, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef", legend=dict(orientation="h", y=1.08, x=0),
                       xaxis=dict(title="trading days from event day (t=0)", gridcolor="#2a3140"),
@@ -476,8 +476,8 @@ def full(s: dict, X: dict, also: list | None = None):
     cases = pd.DataFrame(X["cases"])
     sel: set = set()
     if X.get("rankings"):
-        st.markdown(f"**Factor cuts: {html.escape(X['subject'])}**",
-                    help="Top quintile within the S&P 500 on the event day. Median return relative to S&P 500.")
+        st.markdown(f"**Factor cuts: {html.escape(X['subject'])} · median return relative to S&P 500**",
+                    help="Top quintile within the S&P 500 on the event day.")
         rows = []
         for k, idx in X["rankings"].items():
             sub = cases.iloc[idx] if idx else cases.iloc[0:0]
@@ -503,9 +503,9 @@ def full(s: dict, X: dict, also: list | None = None):
         if tk and not use:
             st.caption(f"{tk}: in no top quintile today; no factor cut.")
         else:
-            st.markdown(f"**Factor cuts: {html.escape(tk)}**" if tk else "**Factor cuts**",
+            st.markdown((f"**Factor cuts: {html.escape(tk)}" if tk else "**Factor cuts") + " · median return relative to S&P 500**",
                         help=(f"Factors where {tk} is top quintile today. " if tk else "")
-                             + "Top quintile within the S&P 500 on the event day. Median return relative to S&P 500.")
+                             + "Top quintile within the S&P 500 on the event day.")
             rows = []
             for j in use:
                 sub = cases[cases.pk.map(lambda v: j in (v or []))]
@@ -518,8 +518,8 @@ def full(s: dict, X: dict, also: list | None = None):
             if none:
                 st.caption(f"No past cases: {', '.join(none)}.")
     elif X["kind"] != "stock" and (X.get("lead") or {}).get("picks_21"):
-        st.markdown("**Factor returns after the event**",
-                    help="Top quintile of the S&P 500 on each factor. Mean return relative to S&P 500.")
+        st.markdown("**Factor returns after the event · mean return relative to S&P 500**",
+                    help="Top quintile of the S&P 500 on each factor.")
         Ld = X["lead"]
         by = {r["pick"]: r for r in Ld.get("picks_252") or []}
         bars([(rk(r["pick"]), (r.get("avg"), r.get("won"), r.get("n")),
@@ -528,7 +528,7 @@ def full(s: dict, X: dict, also: list | None = None):
     rsel: set = set()
     rc = X.get("recent_cases") or []
     if len(cases) or rc:
-        st.markdown("**Past cases**")
+        st.markdown("**Past cases · returns relative to S&P 500**" if X["kind"] == "stock" else "**Past cases · absolute returns**")
         cols = (["who"] if X["kind"] == "stock" else []) + ["date", "year_before", "after_21", "after_252"]
         R = pd.DataFrame(rc)[cols].assign(_src="r", _i=range(len(rc))) if rc else pd.DataFrame(columns=cols + ["_src", "_i"])
         O = cases[cols].assign(_src="o", _i=range(len(cases))) if len(cases) else pd.DataFrame(columns=cols + ["_src", "_i"])
@@ -555,8 +555,10 @@ def full(s: dict, X: dict, also: list | None = None):
                     unsafe_allow_html=True)
     src = " · ".join(f"<a href='{html.escape(x.get('url', ''))}' target='_blank'>{html.escape(x.get('title') or 'source')}</a>"
                      for x in s.get("sources", [])[:3])
-    st.markdown(f"<span class='meta'>{src}<br>Rule: <code>{html.escape(X['event'])}</code>. Returns relative to "
-                f"{X['against'].replace('the S&P 500 average', 'S&amp;P 500')} (equal-weighted, ex-financials); entry at next close. "
+    st.markdown(f"<span class='meta'>{src}<br>Rule: <code>{html.escape(X['event'])}</code>. "
+                + (f"Returns relative to {X['against'].replace('the S&P 500 average', 'S&amp;P 500')} (equal-weighted, ex-financials)"
+                   if X["kind"] == "stock" else f"Returns: {html.escape(measure(X))}, absolute") + "; entry at next close. "
+                
                 f"Prices through {X['data_through']}. {NOT_ADVICE}</span>", unsafe_allow_html=True)
 
 
@@ -748,7 +750,7 @@ def search_ui(prefill: str = "", key: str = "q_tab"):
                 continue
             with st.expander(f"{r.date} · {r.headline} — {r.plain}"):
                 st.markdown(f"<code>{html.escape(r.event)}</code> · {r.past_cases} past cases<br>"
-                            f"{'; '.join(parts) or 'too few past cases'}", unsafe_allow_html=True)
+                            f"{'; '.join(parts) + (' (relative to S&amp;P 500)' if r.kind == 'stock' else ' (absolute)') if parts else 'too few past cases'}", unsafe_allow_html=True)
                 if st.button("Open →", key=f"srch{r.Index}"):
                     f_ = DATA / "days" / f"{r.date}.json.gz"
                     E_ = today if r.date == today["date"] else (load_day(r.date, f_.stat().st_mtime) if f_.exists() else None)
