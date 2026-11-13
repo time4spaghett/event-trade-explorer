@@ -430,6 +430,53 @@ def overlay(X: dict, sel: set | None = None, box: str | None = None, rsel: set |
         st.caption(f"Paths for the {len(P)} most recent past cases only.")
 
 
+def fund_chart(X: dict, sel: set | None = None, rsel: set | None = None):
+    """Company-results events (playbook/fund_events.py): the event's own measure by quarter, before and after.
+    Median and 80% range over every past case; grey lines for the newest 40; ticked rows draw only those cases."""
+    F = X["fund"]
+    x = np.array(F["quarters"])
+    P = np.array([[np.nan if v is None else v for v in p] for p in F["paths"]], float).reshape(-1, len(x))
+    level = F["mode"] != "change"
+    if not np.isfinite(P).any():
+        return
+    st.markdown(f"**Fundamental trajectory · {html.escape(F['label'])}**")
+    fig = go.Figure()
+    for i in (sorted(sel) if sel else [] if rsel else range(max(len(P) - 40, 0), len(P))):
+        c = X["cases"][i]
+        lab = f"{c['who']} {c['date']}"
+        fig.add_scatter(x=x, y=P[i], mode="lines", hoverinfo="text", text=lab, name=lab, showlegend=bool(sel),
+                        line=dict(color=PICKED[len(fig.data) % len(PICKED)] if sel else "rgba(154,163,178,.18)",
+                                  width=2 if sel else 1))
+    for i in sorted(rsel or ()):
+        c = X["recent_cases"][i]
+        if c.get("fpath"):
+            lab = f"{c['who']} {c['date']}"
+            fig.add_scatter(x=x, y=[np.nan if v is None else v for v in c["fpath"]], mode="lines", hoverinfo="text",
+                            text=lab, name=lab, line=dict(color=PICKED[len(fig.data) % len(PICKED)], width=2))
+    yr = None
+    if len(P):
+        ok = np.isfinite(P).sum(0) >= 5
+        with np.errstate(all="ignore"):
+            med = np.where(ok, np.nanmedian(P, axis=0), np.nan)
+            lo = np.where(ok, np.nanpercentile(P, 10, axis=0), np.nan)
+            hi = np.where(ok, np.nanpercentile(P, 90, axis=0), np.nan)
+        fig.add_scatter(x=x, y=hi, mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False)
+        fig.add_scatter(x=x, y=lo, mode="lines", line=dict(width=0), fill="tonexty",
+                        fillcolor="rgba(91,141,239,.30)", name="80% range of past cases", hoverinfo="skip")
+        fig.add_scatter(x=x, y=med, mode="lines+markers", line=dict(color=BLUE, width=3), name="median")
+        if not sel and not rsel and np.isfinite(lo).any():   # scale to the 80% range, with room
+            pad = (np.nanmax(hi) - np.nanmin(lo)) * 0.15
+            yr = [np.nanmin(lo) - pad, np.nanmax(hi) + pad]
+    fig.add_vline(x=0, line_color=DIM, line_dash="dot")
+    fig.update_layout(height=380, margin=dict(l=0, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)",
+                      plot_bgcolor="rgba(0,0,0,0)", font_color="#e6e9ef", legend=dict(orientation="h", y=1.1, x=0),
+                      xaxis=dict(title="quarters from the event quarter (0)", gridcolor="#2a3140", dtick=1),
+                      yaxis=dict(title={"level": "level, by quarter", "assets": "share of total assets at the event quarter",
+                                        "change": "change from the event quarter"}[F["mode"]],
+                                 tickformat=".1%" if level else "+.0%", gridcolor="#2a3140", zerolinecolor=DIM, range=yr))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def bars(rows: list, did: str):
     """rows: (ranking, (value, won, n) at 1 month, (value, won, n) at 1 year); grouped horizontal bars."""
     rows = [r for r in rows if (r[1][2] or 0) or (r[2][2] or 0)]
@@ -549,7 +596,11 @@ def full(s: dict, X: dict, also: list | None = None):
         st.query_params.update({"view": "similar"})
         st.rerun()
     with chart:
+        if X.get("fund"):   # Alex 2026-11-12: price trajectory and fundamental trajectory as separate plots
+            st.markdown("**Price trajectory**")
         overlay(X, sel, box, rsel)
+        if X.get("fund"):
+            fund_chart(X, sel, rsel)
     if s.get("headline"):
         st.markdown(f"<p class='news'><b>News:</b> {html.escape(s['headline'])}. {html.escape(s.get('summary', ''))}</p>",
                     unsafe_allow_html=True)
@@ -693,8 +744,11 @@ def trim(X: dict | None) -> dict | None:
     p0 = X.get("paths_from", 0)
     pk = [(new[p0 + i], p) for i, p in enumerate(X["paths"]) if p0 + i in new]
     pth = {p0 + i: p for i, p in enumerate(X["paths"])}
-    rec = [{**X["cases"][i], "path": pth.get(i)} for i in range(len(X["cases"])) if i not in new]
+    fp = (X.get("fund") or {}).get("paths")   # company-results events: one measure path per case, same order
+    rec = [{**X["cases"][i], "path": pth.get(i), **({"fpath": fp[i]} if fp else {})}
+           for i in range(len(X["cases"])) if i not in new]
     return {**X, "cases": [X["cases"][i] for i in keep], "paths": [p for _, p in pk], "recent_cases": rec,
+            **({"fund": {**X["fund"], "paths": [fp[i] for i in keep]}} if fp else {}),
             "paths_from": pk[0][0] if pk else 0,
             "rankings": {k: [new[i] for i in v if i in new] for k, v in (X.get("rankings") or {}).items()}}
 
